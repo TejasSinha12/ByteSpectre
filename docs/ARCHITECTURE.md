@@ -27,3 +27,21 @@ ByteSpectre is organized around an event-driven JVM analysis pipeline.
 - Distributed scan workers and cloud sandbox orchestration.
 - Graph database export for large-scale relationship querying.
 
+## Detector Architecture
+
+Static detection rules live behind the `JarDetector` interface. Each detector receives an `AnalysisContext` containing class bytecode facts, asset findings, JAR entry names, and manifest attributes, then returns explainable `Indicator` records.
+
+Current detector families:
+
+- `AggregateBytecodeDetector` for reflection, classloader, instrumentation, network, native, process, packet, and mixin signals.
+- `ObfuscationDetector` for short-name and encoded-string clusters.
+- `ManifestDetector` for Java agent entrypoints.
+- `AssetPackagingDetector` for native binaries and nested JAR payloads.
+
+Daily detector work should follow this pattern:
+
+1. Add or update a focused detector.
+2. Register it in `DetectorRegistry`.
+3. Add a fixture-driven unit test.
+4. Surface any new indicator fields in the UI.
+5. Document the detector behavior and confidence assumptions.
