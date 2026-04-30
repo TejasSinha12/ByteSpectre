@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+target/
+build/
+out/
+node_modules/
+dist/
+.env
+.env.local
+*.log
+*.jar
+!.mvn/wrapper/maven-wrapper.jar

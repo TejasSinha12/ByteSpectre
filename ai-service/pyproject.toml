@@ -1,0 +1,16 @@
+[project]
+name = "bytespectre-ai-service"
+version = "0.1.0"
+description = "AI-assisted classification and anomaly scoring service for ByteSpectre"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic>=2.8.0",
+  "numpy>=1.26.0",
+  "scikit-learn>=1.5.0"
+]
+
+[tool.uvicorn]
+factory = false
+

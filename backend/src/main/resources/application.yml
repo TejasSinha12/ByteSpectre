@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: bytespectre
+  servlet:
+    multipart:
+      max-file-size: 512MB
+      max-request-size: 512MB
+
+server:
+  port: 8080
+
+bytespectre:
+  analysis:
+    max-string-scan-bytes: 2097152
+

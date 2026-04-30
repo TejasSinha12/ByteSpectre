@@ -1,0 +1,53 @@
+# ByteSpectre
+
+ByteSpectre is an AI-ready JVM security and reverse engineering platform for analyzing Java applications, Minecraft clients, mods, plugins, and obfuscated JARs.
+
+The repository is organized as a scalable platform rather than a single-purpose utility:
+
+- `backend/` - Spring Boot API and static JAR analysis engine.
+- `frontend/` - React/Vite security workbench UI.
+- `ai-service/` - Python boundary for classification and anomaly scoring.
+- `docs/` - Architecture and expansion notes.
+- `docker-compose.yml` - PostgreSQL and Redis services for the planned analysis pipeline.
+
+## Current Vertical Slice
+
+The first implementation delivers a runnable foundation:
+
+- Upload or reference a JAR for static analysis.
+- Parse JAR metadata, manifests, class counts, package inventory, resources, and translation/assets.
+- Inspect bytecode with ASM for reflection, classloader usage, networking, instrumentation, native calls, packet/client hints, inheritance, and method-call edges.
+- Produce risk scoring, suspicious indicators, behavior categories, and explanation text.
+- Render an enterprise-style analysis dashboard with live event feed, risk breakdown, asset intelligence, and graph-oriented data panels.
+
+## Run
+
+Backend:
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Services:
+
+```bash
+docker compose up -d
+```
+
+AI service:
+
+```bash
+cd ai-service
+uvicorn app.main:app --reload --port 8090
+```
+
+The frontend expects the backend at `http://localhost:8080`.
