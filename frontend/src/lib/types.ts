@@ -19,6 +19,12 @@ export interface ArtifactClassification {
   explanation: string;
 }
 
+export interface DescriptorMetadata {
+  path: string;
+  type: string;
+  fields: Record<string, string>;
+}
+
 export interface PackageSummary {
   name: string;
   classCount: number;
@@ -57,6 +63,7 @@ export interface JarAnalysisReport {
   manifest: Record<string, string>;
   behaviorCategories: string[];
   artifactClassifications: ArtifactClassification[];
+  descriptorMetadata: DescriptorMetadata[];
   indicators: Indicator[];
   packages: PackageSummary[];
   relationships: ClassRelationship[];

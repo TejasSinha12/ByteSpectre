@@ -2,8 +2,10 @@ import { Activity, BrainCircuit, DatabaseZap, RadioTower, SearchCode } from 'luc
 import { useMemo, useState } from 'react';
 import { AssetIntel } from './components/AssetIntel';
 import { ClassificationPanel } from './components/ClassificationPanel';
+import { DescriptorPanel } from './components/DescriptorPanel';
 import { GraphPreview } from './components/GraphPreview';
 import { IndicatorTable } from './components/IndicatorTable';
+import { RelationshipGraph } from './components/RelationshipGraph';
 import { RiskGauge } from './components/RiskGauge';
 import { UploadConsole } from './components/UploadConsole';
 import { analyzeJar, analyzeJarPath } from './lib/api';
@@ -115,6 +117,8 @@ export function App() {
           <section className="analysis-grid">
             <ClassificationPanel classifications={report.artifactClassifications} />
             <IndicatorTable indicators={report.indicators} />
+            <RelationshipGraph relationships={report.relationships} methodCallEdges={report.methodCallEdges} />
+            <DescriptorPanel descriptors={report.descriptorMetadata} />
             <GraphPreview packages={report.packages} relationships={report.relationships} methodCallEdges={report.methodCallEdges} />
             <AssetIntel findings={report.assetFindings} />
             <section className="panel ai-panel">

@@ -394,6 +394,96 @@ nav a:hover {
   padding: 5px 7px;
 }
 
+.descriptor-list {
+  display: grid;
+  gap: 12px;
+}
+
+.descriptor-list article {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 12px;
+}
+
+.descriptor-list strong,
+.descriptor-list code {
+  display: block;
+}
+
+.descriptor-list code {
+  color: #d7eee9;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.descriptor-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.descriptor-fields span {
+  min-width: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px;
+}
+
+.descriptor-fields b,
+.descriptor-fields i {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.descriptor-fields b {
+  color: #66d9c7;
+  font-size: 0.74rem;
+}
+
+.descriptor-fields i {
+  color: #d3dfdf;
+  font-style: normal;
+  margin-top: 3px;
+}
+
+.relationship-graph {
+  grid-column: 1 / -1;
+}
+
+.relationship-graph svg {
+  width: 100%;
+  min-height: 320px;
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    rgba(0, 0, 0, 0.18);
+  background-size: 34px 34px;
+}
+
+.relationship-graph line {
+  stroke: rgba(102, 217, 199, 0.28);
+  stroke-width: 1.5;
+}
+
+.relationship-graph circle {
+  fill: #132426;
+  stroke: #66d9c7;
+  stroke-width: 2;
+}
+
+.relationship-graph text {
+  fill: #d8e7e4;
+  font-size: 13px;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: rgba(9, 13, 18, 0.92);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
 .table-row {
   display: grid;
   grid-template-columns: 1fr minmax(180px, 1.4fr) minmax(160px, 1fr) 58px;
@@ -585,6 +675,10 @@ nav a:hover {
   }
 
   .table-row {
+    grid-template-columns: 1fr;
+  }
+
+  .descriptor-fields {
     grid-template-columns: 1fr;
   }
 
