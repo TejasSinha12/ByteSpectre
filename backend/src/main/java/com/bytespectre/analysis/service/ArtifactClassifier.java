@@ -26,6 +26,7 @@ public class ArtifactClassifier {
 
         List<ArtifactClassification> classifications = new ArrayList<>();
         detectFabricMod(classifications, loweredEntries, loweredPackages);
+        detectQuiltMod(classifications, loweredEntries, loweredPackages);
         detectForgeMod(classifications, loweredEntries, loweredPackages);
         detectBukkitPlugin(classifications, loweredEntries, loweredPackages);
         detectPaperPlugin(classifications, loweredEntries, loweredPackages);
@@ -63,8 +64,8 @@ public class ArtifactClassifier {
     }
 
     private void detectForgeMod(List<ArtifactClassification> classifications, List<String> entries, List<String> packages) {
-        List<String> evidence = evidence(entries, "meta-inf/mods.toml", "mods.toml");
-        if (!evidence.isEmpty() || containsAny(packages, "net.minecraftforge", "minecraftforge", "fmlclientsetup")) {
+        List<String> evidence = evidence(entries, "meta-inf/mods.toml", "mods.toml", "meta-inf/neoforge.mods.toml", "neoforge.mods.toml");
+        if (!evidence.isEmpty() || containsAny(packages, "net.minecraftforge", "minecraftforge", "neoforged", "fmlclientsetup")) {
             classifications.add(new ArtifactClassification(
                     "artifact.minecraft.forge-mod",
                     "Minecraft Forge Mod",
@@ -72,6 +73,20 @@ public class ArtifactClassifier {
                     evidence.isEmpty() ? 74 : 96,
                     evidence.isEmpty() ? List.of("Forge/FML package references") : evidence,
                     "Forge metadata or FML references indicate a Minecraft mod targeting Forge or NeoForge-style loading."
+            ));
+        }
+    }
+
+    private void detectQuiltMod(List<ArtifactClassification> classifications, List<String> entries, List<String> packages) {
+        List<String> evidence = evidence(entries, "quilt.mod.json");
+        if (!evidence.isEmpty() || containsAny(packages, "org.quiltmc", "quiltloader")) {
+            classifications.add(new ArtifactClassification(
+                    "artifact.minecraft.quilt-mod",
+                    "Minecraft Quilt Mod",
+                    "Minecraft Mod",
+                    evidence.isEmpty() ? 72 : 96,
+                    evidence.isEmpty() ? List.of("Quilt package references") : evidence,
+                    "Quilt metadata or loader references indicate a Minecraft mod targeting the Quilt ecosystem."
             ));
         }
     }
@@ -203,4 +218,3 @@ public class ArtifactClassifier {
         return false;
     }
 }
-

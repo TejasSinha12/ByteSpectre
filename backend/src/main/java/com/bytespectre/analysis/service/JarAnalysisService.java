@@ -7,6 +7,7 @@ import com.bytespectre.analysis.detector.DetectorRegistry;
 import com.bytespectre.analysis.model.ArtifactClassification;
 import com.bytespectre.analysis.model.AssetFinding;
 import com.bytespectre.analysis.model.ClassRelationship;
+import com.bytespectre.analysis.model.DescriptorMetadata;
 import com.bytespectre.analysis.model.Indicator;
 import com.bytespectre.analysis.model.JarAnalysisReport;
 import com.bytespectre.analysis.model.MethodCallEdge;
@@ -40,10 +41,12 @@ public class JarAnalysisService {
     private final BytecodeFactExtractor extractor = new BytecodeFactExtractor();
     private final DetectorRegistry detectorRegistry;
     private final ArtifactClassifier artifactClassifier;
+    private final DescriptorMetadataExtractor descriptorMetadataExtractor;
 
-    public JarAnalysisService(DetectorRegistry detectorRegistry, ArtifactClassifier artifactClassifier) {
+    public JarAnalysisService(DetectorRegistry detectorRegistry, ArtifactClassifier artifactClassifier, DescriptorMetadataExtractor descriptorMetadataExtractor) {
         this.detectorRegistry = detectorRegistry;
         this.artifactClassifier = artifactClassifier;
+        this.descriptorMetadataExtractor = descriptorMetadataExtractor;
     }
 
     public JarAnalysisReport analyze(MultipartFile upload) throws IOException {
@@ -71,6 +74,7 @@ public class JarAnalysisService {
         Map<String, Long> resourceSummary = new LinkedHashMap<>();
         Map<String, String> manifest = new LinkedHashMap<>();
         List<String> jarEntryNames = new ArrayList<>();
+        List<DescriptorMetadata> descriptorMetadata = new ArrayList<>();
 
         try (JarFile jar = new JarFile(jarPath.toFile())) {
             Manifest jarManifest = jar.getManifest();
@@ -83,6 +87,11 @@ public class JarAnalysisService {
                 jarEntryNames.add(entry.getName());
                 classifyResource(resourceSummary, entry.getName());
                 inspectAsset(entry.getName(), assetFindings);
+                if (descriptorMetadataExtractor.isDescriptor(entry.getName())) {
+                    try (InputStream input = jar.getInputStream(entry)) {
+                        descriptorMetadata.add(descriptorMetadataExtractor.extract(entry.getName(), input.readAllBytes()));
+                    }
+                }
 
                 if (entry.getName().endsWith(".class") && entry.getSize() <= MAX_CLASS_BYTES) {
                     try (InputStream input = jar.getInputStream(entry)) {
@@ -125,6 +134,7 @@ public class JarAnalysisService {
                 manifest,
                 categories,
                 artifactClassifications,
+                descriptorMetadata,
                 indicators,
                 packages,
                 relationships,

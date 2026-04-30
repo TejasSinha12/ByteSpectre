@@ -15,6 +15,7 @@ public record JarAnalysisReport(
         Map<String, String> manifest,
         List<String> behaviorCategories,
         List<ArtifactClassification> artifactClassifications,
+        List<DescriptorMetadata> descriptorMetadata,
         List<Indicator> indicators,
         List<PackageSummary> packages,
         List<ClassRelationship> relationships,

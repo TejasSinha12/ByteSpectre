@@ -3,6 +3,7 @@ package com.bytespectre.analysis;
 import com.bytespectre.analysis.model.JarAnalysisReport;
 import com.bytespectre.analysis.detector.DetectorRegistry;
 import com.bytespectre.analysis.service.ArtifactClassifier;
+import com.bytespectre.analysis.service.DescriptorMetadataExtractor;
 import com.bytespectre.analysis.service.JarAnalysisService;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,7 +23,7 @@ class JarAnalysisServiceTest {
             output.closeEntry();
         }
 
-        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier()).analyze(jar);
+        JarAnalysisReport report = service().analyze(jar);
 
         assertThat(report.fileName()).endsWith(".jar");
         assertThat(report.resourceSummary()).containsEntry("translations", 1L);
@@ -38,7 +39,7 @@ class JarAnalysisServiceTest {
             output.closeEntry();
         }
 
-        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier()).analyze(jar);
+        JarAnalysisReport report = service().analyze(jar);
 
         assertThat(report.indicators())
                 .anySatisfy(indicator -> {
@@ -56,7 +57,7 @@ class JarAnalysisServiceTest {
             output.closeEntry();
         }
 
-        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier()).analyze(jar);
+        JarAnalysisReport report = service().analyze(jar);
 
         assertThat(report.artifactClassifications())
                 .anySatisfy(classification -> {
@@ -64,6 +65,11 @@ class JarAnalysisServiceTest {
                     assertThat(classification.confidence()).isGreaterThanOrEqualTo(90);
                 });
         assertThat(report.behaviorCategories()).contains("Minecraft Mod");
+        assertThat(report.descriptorMetadata())
+                .anySatisfy(descriptor -> {
+                    assertThat(descriptor.type()).isEqualTo("Fabric mod descriptor");
+                    assertThat(descriptor.fields()).containsEntry("id", "spectre-test");
+                });
     }
 
     @Test
@@ -75,7 +81,7 @@ class JarAnalysisServiceTest {
             output.closeEntry();
         }
 
-        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier()).analyze(jar);
+        JarAnalysisReport report = service().analyze(jar);
 
         assertThat(report.artifactClassifications())
                 .anySatisfy(classification -> {
@@ -83,5 +89,9 @@ class JarAnalysisServiceTest {
                     assertThat(classification.family()).isEqualTo("Minecraft Server Plugin");
                 });
         assertThat(report.behaviorCategories()).contains("Minecraft Server Plugin");
+    }
+
+    private JarAnalysisService service() {
+        return new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier(), new DescriptorMetadataExtractor());
     }
 }
