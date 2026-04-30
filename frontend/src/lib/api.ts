@@ -10,7 +10,7 @@ export async function analyzeJar(file: File): Promise<JarAnalysisReport> {
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw new Error(await errorMessage(response));
   }
 
   return response.json();
@@ -23,9 +23,18 @@ export async function analyzeJarPath(path: string): Promise<JarAnalysisReport> {
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw new Error(await errorMessage(response));
   }
 
   return response.json();
 }
 
+async function errorMessage(response: Response): Promise<string> {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    const body = await response.json() as { message?: string; error?: string };
+    return body.message || body.error || `Request failed with HTTP ${response.status}`;
+  }
+  const text = await response.text();
+  return text || `Request failed with HTTP ${response.status}`;
+}
