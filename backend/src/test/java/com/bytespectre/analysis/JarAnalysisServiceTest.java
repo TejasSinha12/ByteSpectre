@@ -2,6 +2,7 @@ package com.bytespectre.analysis;
 
 import com.bytespectre.analysis.model.JarAnalysisReport;
 import com.bytespectre.analysis.detector.DetectorRegistry;
+import com.bytespectre.analysis.service.ArtifactClassifier;
 import com.bytespectre.analysis.service.JarAnalysisService;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,7 +22,7 @@ class JarAnalysisServiceTest {
             output.closeEntry();
         }
 
-        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry()).analyze(jar);
+        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier()).analyze(jar);
 
         assertThat(report.fileName()).endsWith(".jar");
         assertThat(report.resourceSummary()).containsEntry("translations", 1L);
@@ -37,12 +38,50 @@ class JarAnalysisServiceTest {
             output.closeEntry();
         }
 
-        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry()).analyze(jar);
+        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier()).analyze(jar);
 
         assertThat(report.indicators())
                 .anySatisfy(indicator -> {
                     assertThat(indicator.id()).isEqualTo("assets.native");
                     assertThat(indicator.confidence()).isGreaterThanOrEqualTo(80);
                 });
+    }
+
+    @Test
+    void classifiesFabricModFromDescriptor() throws Exception {
+        Path jar = Files.createTempFile("bytespectre-fabric-test-", ".jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+            output.putNextEntry(new JarEntry("fabric.mod.json"));
+            output.write("{\"id\":\"spectre-test\"}".getBytes());
+            output.closeEntry();
+        }
+
+        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier()).analyze(jar);
+
+        assertThat(report.artifactClassifications())
+                .anySatisfy(classification -> {
+                    assertThat(classification.id()).isEqualTo("artifact.minecraft.fabric-mod");
+                    assertThat(classification.confidence()).isGreaterThanOrEqualTo(90);
+                });
+        assertThat(report.behaviorCategories()).contains("Minecraft Mod");
+    }
+
+    @Test
+    void classifiesBukkitPluginFromDescriptor() throws Exception {
+        Path jar = Files.createTempFile("bytespectre-bukkit-test-", ".jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+            output.putNextEntry(new JarEntry("plugin.yml"));
+            output.write("name: SpectrePlugin\nmain: test.Plugin\n".getBytes());
+            output.closeEntry();
+        }
+
+        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier()).analyze(jar);
+
+        assertThat(report.artifactClassifications())
+                .anySatisfy(classification -> {
+                    assertThat(classification.id()).isEqualTo("artifact.minecraft.bukkit-plugin");
+                    assertThat(classification.family()).isEqualTo("Minecraft Server Plugin");
+                });
+        assertThat(report.behaviorCategories()).contains("Minecraft Server Plugin");
     }
 }

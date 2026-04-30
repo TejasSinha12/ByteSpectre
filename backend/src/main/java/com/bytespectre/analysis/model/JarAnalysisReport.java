@@ -14,6 +14,7 @@ public record JarAnalysisReport(
         String summary,
         Map<String, String> manifest,
         List<String> behaviorCategories,
+        List<ArtifactClassification> artifactClassifications,
         List<Indicator> indicators,
         List<PackageSummary> packages,
         List<ClassRelationship> relationships,
@@ -23,4 +24,3 @@ public record JarAnalysisReport(
         Map<String, Object> aiSignals
 ) {
 }
-

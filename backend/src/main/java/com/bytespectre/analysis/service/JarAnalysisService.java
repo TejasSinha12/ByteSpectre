@@ -4,6 +4,7 @@ import com.bytespectre.analysis.bytecode.BytecodeFactExtractor;
 import com.bytespectre.analysis.bytecode.ClassBytecodeFacts;
 import com.bytespectre.analysis.detector.AnalysisContext;
 import com.bytespectre.analysis.detector.DetectorRegistry;
+import com.bytespectre.analysis.model.ArtifactClassification;
 import com.bytespectre.analysis.model.AssetFinding;
 import com.bytespectre.analysis.model.ClassRelationship;
 import com.bytespectre.analysis.model.Indicator;
@@ -38,9 +39,11 @@ public class JarAnalysisService {
     private static final int MAX_CLASS_BYTES = 12 * 1024 * 1024;
     private final BytecodeFactExtractor extractor = new BytecodeFactExtractor();
     private final DetectorRegistry detectorRegistry;
+    private final ArtifactClassifier artifactClassifier;
 
-    public JarAnalysisService(DetectorRegistry detectorRegistry) {
+    public JarAnalysisService(DetectorRegistry detectorRegistry, ArtifactClassifier artifactClassifier) {
         this.detectorRegistry = detectorRegistry;
+        this.artifactClassifier = artifactClassifier;
     }
 
     public JarAnalysisReport analyze(MultipartFile upload) throws IOException {
@@ -92,9 +95,10 @@ public class JarAnalysisService {
         }
 
         List<Indicator> indicators = detectorRegistry.detect(new AnalysisContext(classFacts, assetFindings, jarEntryNames, manifest));
+        List<ArtifactClassification> artifactClassifications = artifactClassifier.classify(classFacts, assetFindings, jarEntryNames, manifest);
         int riskScore = calculateRiskScore(indicators, classFacts, assetFindings);
         RiskLevel riskLevel = riskLevel(riskScore);
-        List<String> categories = behaviorCategories(classFacts, indicators, assetFindings);
+        List<String> categories = behaviorCategories(classFacts, indicators, assetFindings, artifactClassifications);
         List<PackageSummary> packages = packageSummaries(classFacts);
 
         List<ClassRelationship> relationships = classFacts.stream()
@@ -120,6 +124,7 @@ public class JarAnalysisService {
                 summary,
                 manifest,
                 categories,
+                artifactClassifications,
                 indicators,
                 packages,
                 relationships,
@@ -184,10 +189,13 @@ public class JarAnalysisService {
         return RiskLevel.LOW;
     }
 
-    private List<String> behaviorCategories(List<ClassBytecodeFacts> facts, List<Indicator> indicators, List<AssetFinding> assets) {
+    private List<String> behaviorCategories(List<ClassBytecodeFacts> facts, List<Indicator> indicators, List<AssetFinding> assets, List<ArtifactClassification> classifications) {
         Set<String> categories = new HashSet<>();
         for (Indicator indicator : indicators) {
             categories.add(indicator.category());
+        }
+        for (ArtifactClassification classification : classifications) {
+            categories.add(classification.family());
         }
         if (facts.stream().anyMatch(ClassBytecodeFacts::hasMinecraftSignals)) {
             categories.add("Minecraft/JVM Modding");
