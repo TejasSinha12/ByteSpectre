@@ -27,6 +27,23 @@ ByteSpectre is organized around an event-driven JVM analysis pipeline.
 - Distributed scan workers and cloud sandbox orchestration.
 - Graph database export for large-scale relationship querying.
 
+## Runtime Sandbox Agent
+
+The `sandbox-agent/` module is the first runtime analysis boundary. It builds a Java agent with `Premain-Class` and `Agent-Class` manifest entries, installs a class-load transformer, and emits structured sandbox events to stdout.
+
+Current telemetry:
+
+- Agent install and shutdown events.
+- Interesting class loads for reflection, instrumentation, networking, Netty, ASM, Mixin, Minecraft, Bukkit, Fabric, and Forge namespaces.
+
+Near-term expansion:
+
+- Socket connect tracing.
+- Reflection invocation tracing.
+- Thread creation tracing.
+- Process execution interception.
+- WebSocket streaming back to the Spring Boot API.
+
 ## Detector Architecture
 
 Static detection rules live behind the `JarDetector` interface. Each detector receives an `AnalysisContext` containing class bytecode facts, asset findings, JAR entry names, and manifest attributes, then returns explainable `Indicator` records.
@@ -53,6 +70,7 @@ Artifact classification runs before risk interpretation and answers a different 
 Current families:
 
 - Minecraft Fabric mod.
+- Minecraft Quilt mod.
 - Minecraft Forge or NeoForge-style mod.
 - Bukkit, Spigot, Paper server plugin.
 - Velocity and BungeeCord proxy plugin.
@@ -61,3 +79,5 @@ Current families:
 - Generic executable Java application or library.
 
 This taxonomy should grow independently from suspicious behavior detectors. A plugin or mod can be perfectly benign, while malware-like behavior can appear in any family.
+
+Descriptor metadata is extracted separately from classification. Known descriptor formats such as `fabric.mod.json`, `quilt.mod.json`, `mods.toml`, `plugin.yml`, `paper-plugin.yml`, `velocity-plugin.json`, and `bungee.yml` are parsed into compact key/value fields for UI inspection and future AI feature enrichment.

@@ -7,6 +7,7 @@ The repository is organized as a scalable platform rather than a single-purpose 
 - `backend/` - Spring Boot API and static JAR analysis engine.
 - `frontend/` - React/Vite security workbench UI.
 - `ai-service/` - Python boundary for classification and anomaly scoring.
+- `sandbox-agent/` - Java agent scaffold for runtime sandbox telemetry.
 - `docs/` - Architecture and expansion notes.
 - `docker-compose.yml` - PostgreSQL and Redis services for the planned analysis pipeline.
 
@@ -48,6 +49,14 @@ AI service:
 ```bash
 cd ai-service
 uvicorn app.main:app --reload --port 8090
+```
+
+Sandbox agent:
+
+```bash
+cd sandbox-agent
+mvn package
+java -javaagent:target/bytespectre-sandbox-agent-0.1.0-SNAPSHOT.jar -jar /path/to/sample.jar
 ```
 
 The frontend expects the backend at `http://localhost:8080`.
