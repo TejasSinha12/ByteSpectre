@@ -45,3 +45,19 @@ Daily detector work should follow this pattern:
 3. Add a fixture-driven unit test.
 4. Surface any new indicator fields in the UI.
 5. Document the detector behavior and confidence assumptions.
+
+## Artifact Classification
+
+Artifact classification runs before risk interpretation and answers a different question: what kind of JAR is this? The classifier emits `ArtifactClassification` records with label, family, confidence, evidence, and explanation.
+
+Current families:
+
+- Minecraft Fabric mod.
+- Minecraft Forge or NeoForge-style mod.
+- Bukkit, Spigot, Paper server plugin.
+- Velocity and BungeeCord proxy plugin.
+- Minecraft client-side JAR.
+- Java agent.
+- Generic executable Java application or library.
+
+This taxonomy should grow independently from suspicious behavior detectors. A plugin or mod can be perfectly benign, while malware-like behavior can appear in any family.
