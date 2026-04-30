@@ -147,6 +147,30 @@ nav a:hover {
   margin-bottom: 18px;
 }
 
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin: -8px 0 16px;
+}
+
+.report-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(102, 217, 199, 0.25);
+  border-radius: 7px;
+  background: rgba(102, 217, 199, 0.1);
+  color: #d8fff8;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+
+.report-actions button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
 .drop-target,
 .path-form,
 .panel,
@@ -268,6 +292,22 @@ nav a:hover {
   line-height: 1.55;
 }
 
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.category-chips span {
+  border: 1px solid rgba(102, 217, 199, 0.2);
+  border-radius: 999px;
+  background: rgba(102, 217, 199, 0.08);
+  color: #d9fbf5;
+  padding: 5px 8px;
+  font-size: 0.78rem;
+}
+
 .summary-metrics {
   gap: 10px;
   margin-top: 18px;
@@ -333,6 +373,24 @@ nav a:hover {
 .table {
   display: grid;
   gap: 10px;
+}
+
+.indicator-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 210px);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.indicator-controls input,
+.indicator-controls select {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 7px;
+  outline: 0;
+  background: rgba(255, 255, 255, 0.05);
+  color: #edf4f8;
+  padding: 10px;
 }
 
 .classification-list {
@@ -670,11 +728,24 @@ nav a:hover {
     width: 100%;
   }
 
+  .report-actions {
+    justify-content: stretch;
+  }
+
+  .report-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+
   nav {
     display: none;
   }
 
   .table-row {
+    grid-template-columns: 1fr;
+  }
+
+  .indicator-controls {
     grid-template-columns: 1fr;
   }
 

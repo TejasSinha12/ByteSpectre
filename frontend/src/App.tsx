@@ -1,11 +1,13 @@
 import { Activity, BrainCircuit, DatabaseZap, RadioTower, SearchCode } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AssetIntel } from './components/AssetIntel';
+import { CategoryChips } from './components/CategoryChips';
 import { ClassificationPanel } from './components/ClassificationPanel';
 import { DescriptorPanel } from './components/DescriptorPanel';
 import { GraphPreview } from './components/GraphPreview';
 import { IndicatorTable } from './components/IndicatorTable';
 import { RelationshipGraph } from './components/RelationshipGraph';
+import { ReportActions } from './components/ReportActions';
 import { RiskGauge } from './components/RiskGauge';
 import { UploadConsole } from './components/UploadConsole';
 import { analyzeJar, analyzeJarPath } from './lib/api';
@@ -82,6 +84,8 @@ export function App() {
           </div>
         </header>
 
+        <ReportActions report={report} />
+
         <UploadConsole
           busy={busy}
           onUpload={(file) => runAnalysis(() => analyzeJar(file))}
@@ -96,6 +100,7 @@ export function App() {
             <p className="eyebrow">Analysis summary</p>
             <h3>{report?.fileName ?? 'No artifact loaded'}</h3>
             <p>{report?.summary ?? 'Upload a JAR or analyze a local path to begin static triage.'}</p>
+            {report && <CategoryChips categories={report.behaviorCategories} />}
             <div className="summary-metrics">
               <Metric label="Resources" value={resourceTotal} />
               <Metric label="Indicators" value={report?.indicators.length ?? 0} />
