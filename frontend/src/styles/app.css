@@ -337,7 +337,7 @@ nav a:hover {
 
 .table-row {
   display: grid;
-  grid-template-columns: 1fr minmax(180px, 1.4fr) minmax(160px, 1fr) 36px;
+  grid-template-columns: 1fr minmax(180px, 1.4fr) minmax(160px, 1fr) 58px;
   gap: 12px;
   align-items: start;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
@@ -367,9 +367,20 @@ nav a:hover {
   text-overflow: ellipsis;
 }
 
-.table-row b {
+.indicator-score {
+  display: grid;
+  gap: 3px;
   justify-self: end;
+  text-align: right;
+}
+
+.indicator-score b {
   color: #ffca7a;
+}
+
+.indicator-score span {
+  color: #66d9c7;
+  font-size: 0.78rem;
 }
 
 .graph-grid {
@@ -518,8 +529,8 @@ nav a:hover {
     grid-template-columns: 1fr;
   }
 
-  .table-row b {
+  .indicator-score {
     justify-self: start;
+    text-align: left;
   }
 }
-

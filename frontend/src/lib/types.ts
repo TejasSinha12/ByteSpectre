@@ -5,6 +5,7 @@ export interface Indicator {
   title: string;
   category: string;
   severity: number;
+  confidence: number;
   evidence: string;
   explanation: string;
 }
@@ -54,4 +55,3 @@ export interface JarAnalysisReport {
   resourceSummary: Record<string, number>;
   aiSignals: Record<string, unknown>;
 }
-

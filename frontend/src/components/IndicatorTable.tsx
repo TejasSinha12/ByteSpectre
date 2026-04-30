@@ -27,7 +27,10 @@ export function IndicatorTable({ indicators }: IndicatorTableProps) {
               </div>
               <p>{indicator.explanation}</p>
               <code>{indicator.evidence}</code>
-              <b>{indicator.severity}</b>
+              <div className="indicator-score">
+                <b>S{indicator.severity}</b>
+                <span>{indicator.confidence}%</span>
+              </div>
             </article>
           ))
         )}
@@ -35,4 +38,3 @@ export function IndicatorTable({ indicators }: IndicatorTableProps) {
     </section>
   );
 }
-
