@@ -2,6 +2,8 @@ package com.bytespectre.analysis.service;
 
 import com.bytespectre.analysis.bytecode.BytecodeFactExtractor;
 import com.bytespectre.analysis.bytecode.ClassBytecodeFacts;
+import com.bytespectre.analysis.detector.AnalysisContext;
+import com.bytespectre.analysis.detector.DetectorRegistry;
 import com.bytespectre.analysis.model.AssetFinding;
 import com.bytespectre.analysis.model.ClassRelationship;
 import com.bytespectre.analysis.model.Indicator;
@@ -27,6 +29,7 @@ import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+import java.util.function.Predicate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -34,6 +37,11 @@ import org.springframework.web.multipart.MultipartFile;
 public class JarAnalysisService {
     private static final int MAX_CLASS_BYTES = 12 * 1024 * 1024;
     private final BytecodeFactExtractor extractor = new BytecodeFactExtractor();
+    private final DetectorRegistry detectorRegistry;
+
+    public JarAnalysisService(DetectorRegistry detectorRegistry) {
+        this.detectorRegistry = detectorRegistry;
+    }
 
     public JarAnalysisReport analyze(MultipartFile upload) throws IOException {
         Path tempFile = Files.createTempFile("bytespectre-upload-", ".jar");
@@ -83,7 +91,7 @@ public class JarAnalysisService {
             }
         }
 
-        List<Indicator> indicators = buildIndicators(classFacts, assetFindings, jarEntryNames, manifest);
+        List<Indicator> indicators = detectorRegistry.detect(new AnalysisContext(classFacts, assetFindings, jarEntryNames, manifest));
         int riskScore = calculateRiskScore(indicators, classFacts, assetFindings);
         RiskLevel riskLevel = riskLevel(riskScore);
         List<String> categories = behaviorCategories(classFacts, indicators, assetFindings);
@@ -154,60 +162,10 @@ public class JarAnalysisService {
         }
     }
 
-    private List<Indicator> buildIndicators(List<ClassBytecodeFacts> facts, List<AssetFinding> assets, List<String> entries, Map<String, String> manifest) {
-        List<Indicator> indicators = new ArrayList<>();
-        addAggregateIndicator(indicators, facts, ClassBytecodeFacts::usesReflection, "reflection", "Reflective access", "Reflection usage can hide call targets from simple static inspection.", 3);
-        addAggregateIndicator(indicators, facts, ClassBytecodeFacts::usesClassLoader, "classloader", "Dynamic class loading", "Custom class loading can unpack payloads, inject classes, or bypass static discovery.", 5);
-        addAggregateIndicator(indicators, facts, ClassBytecodeFacts::usesInstrumentation, "instrumentation", "JVM instrumentation API", "Instrumentation hooks can redefine classes, trace runtime behavior, or modify application execution.", 6);
-        addAggregateIndicator(indicators, facts, ClassBytecodeFacts::usesNetworking, "networking", "Network behavior", "Network APIs indicate runtime communication that should be inspected in sandbox mode.", 4);
-        addAggregateIndicator(indicators, facts, ClassBytecodeFacts::usesNativeAccess, "native", "Native library loading", "Native access can evade JVM-level controls and should be isolated.", 7);
-        addAggregateIndicator(indicators, facts, ClassBytecodeFacts::usesProcessExecution, "process", "Process execution", "Launching host processes is high-risk behavior for untrusted JARs.", 8);
-        addAggregateIndicator(indicators, facts, ClassBytecodeFacts::hasPacketSignals, "packet", "Packet or protocol manipulation", "Bytecode and strings suggest packet flow, Netty pipeline, or protocol manipulation.", 4);
-        addAggregateIndicator(indicators, facts, ClassBytecodeFacts::hasMixinSignals, "mixin", "Mixin or injection markers", "Mixin/injection-style classes can modify host application behavior at runtime.", 4);
-
-        long shortClassNames = facts.stream().filter(fact -> simpleName(fact.className()).length() <= 2).count();
-        if (facts.size() > 20 && shortClassNames > facts.size() * 0.35) {
-            indicators.add(new Indicator("obfuscation.short-names", "Obfuscated class naming", "Obfuscation", 5, shortClassNames + " very short class names", "A high ratio of one or two character class names often indicates name obfuscation."));
-        }
-
-        long encodedStrings = facts.stream()
-                .flatMap(fact -> fact.stringConstants().stream())
-                .filter(JarAnalysisService::looksEncoded)
-                .limit(100)
-                .count();
-        if (encodedStrings > 10) {
-            indicators.add(new Indicator("strings.encoded", "Encoded string clusters", "Obfuscation", 4, encodedStrings + " encoded-looking constants", "Repeated high-entropy string constants may indicate encrypted configuration, payloads, or string obfuscation."));
-        }
-
-        if (manifest.keySet().stream().anyMatch(key -> key.equalsIgnoreCase("Premain-Class") || key.equalsIgnoreCase("Agent-Class"))) {
-            indicators.add(new Indicator("manifest.agent", "Java agent entrypoint", "Runtime Instrumentation", 8, manifest.toString(), "The manifest declares Java agent entrypoints that can instrument other JVM code."));
-        }
-
-        long nativeAssets = assets.stream().filter(asset -> asset.type().equals("native")).count();
-        if (nativeAssets > 0) {
-            indicators.add(new Indicator("assets.native", "Native binary resources", "Native Boundary", 6, nativeAssets + " native resources", "Bundled native code should be reviewed and sandboxed before execution."));
-        }
-
-        long nestedJars = entries.stream().filter(name -> name.endsWith(".jar")).count();
-        if (nestedJars > 0) {
-            indicators.add(new Indicator("resources.nested-jars", "Nested JAR payloads", "Packaging", 5, nestedJars + " nested JAR resources", "Nested archives can carry staged dependencies or hidden payloads."));
-        }
-        return indicators;
-    }
-
-    private void addAggregateIndicator(List<Indicator> indicators, List<ClassBytecodeFacts> facts, FactPredicate predicate, String id, String title, String explanation, int severity) {
-        List<String> classes = facts.stream()
-                .filter(predicate::matches)
-                .map(ClassBytecodeFacts::className)
-                .limit(5)
-                .toList();
-        if (!classes.isEmpty()) {
-            indicators.add(new Indicator("bytecode." + id, title, "Bytecode", severity, String.join(", ", classes), explanation));
-        }
-    }
-
     private int calculateRiskScore(List<Indicator> indicators, List<ClassBytecodeFacts> facts, List<AssetFinding> assets) {
-        int score = indicators.stream().mapToInt(indicator -> indicator.severity() * 8).sum();
+        int score = indicators.stream()
+                .mapToInt(indicator -> (int) Math.round(indicator.severity() * 8 * (indicator.confidence() / 100.0)))
+                .sum();
         score += Math.min(12, assets.size() * 2);
         score += facts.stream().anyMatch(ClassBytecodeFacts::hasMinecraftSignals) ? 4 : 0;
         return Math.min(100, score);
@@ -282,11 +240,11 @@ public class JarAnalysisService {
         return signals;
     }
 
-    private double ratio(List<ClassBytecodeFacts> facts, FactPredicate predicate) {
+    private double ratio(List<ClassBytecodeFacts> facts, Predicate<ClassBytecodeFacts> predicate) {
         if (facts.isEmpty()) {
             return 0.0;
         }
-        long matches = facts.stream().filter(predicate::matches).count();
+        long matches = facts.stream().filter(predicate).count();
         return Math.round((matches / (double) facts.size()) * 1000.0) / 1000.0;
     }
 
@@ -302,24 +260,6 @@ public class JarAnalysisService {
         return containsAny(value, "reflect", "classloader", "instrument", "netty", "socket", "url", "runtime.exec", "processbuilder", "packet", "mixin", "loadlibrary", "defineclass");
     }
 
-    private static boolean looksEncoded(String value) {
-        if (value.length() < 24) {
-            return false;
-        }
-        int encodedChars = 0;
-        for (char character : value.toCharArray()) {
-            if (Character.isLetterOrDigit(character) || character == '+' || character == '/' || character == '=' || character == '_' || character == '-') {
-                encodedChars++;
-            }
-        }
-        return encodedChars / (double) value.length() > 0.92;
-    }
-
-    private static String simpleName(String className) {
-        int split = className.lastIndexOf('.');
-        return split >= 0 ? className.substring(split + 1) : className;
-    }
-
     private static boolean containsAny(String value, String... needles) {
         for (String needle : needles) {
             if (value.contains(needle)) {
@@ -328,10 +268,4 @@ public class JarAnalysisService {
         }
         return false;
     }
-
-    @FunctionalInterface
-    private interface FactPredicate {
-        boolean matches(ClassBytecodeFacts facts);
-    }
 }
-

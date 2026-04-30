@@ -5,8 +5,8 @@ public record Indicator(
         String title,
         String category,
         int severity,
+        int confidence,
         String evidence,
         String explanation
 ) {
 }
-

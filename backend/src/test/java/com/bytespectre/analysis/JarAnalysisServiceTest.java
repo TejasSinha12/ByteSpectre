@@ -1,6 +1,7 @@
 package com.bytespectre.analysis;
 
 import com.bytespectre.analysis.model.JarAnalysisReport;
+import com.bytespectre.analysis.detector.DetectorRegistry;
 import com.bytespectre.analysis.service.JarAnalysisService;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,11 +21,28 @@ class JarAnalysisServiceTest {
             output.closeEntry();
         }
 
-        JarAnalysisReport report = new JarAnalysisService().analyze(jar);
+        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry()).analyze(jar);
 
         assertThat(report.fileName()).endsWith(".jar");
         assertThat(report.resourceSummary()).containsEntry("translations", 1L);
         assertThat(report.assetFindings()).isNotEmpty();
     }
-}
 
+    @Test
+    void reportsNativeAssetIndicatorWithConfidence() throws Exception {
+        Path jar = Files.createTempFile("bytespectre-native-test-", ".jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+            output.putNextEntry(new JarEntry("native/libpayload.dylib"));
+            output.write(new byte[] {1, 2, 3});
+            output.closeEntry();
+        }
+
+        JarAnalysisReport report = new JarAnalysisService(new DetectorRegistry()).analyze(jar);
+
+        assertThat(report.indicators())
+                .anySatisfy(indicator -> {
+                    assertThat(indicator.id()).isEqualTo("assets.native");
+                    assertThat(indicator.confidence()).isGreaterThanOrEqualTo(80);
+                });
+    }
+}
