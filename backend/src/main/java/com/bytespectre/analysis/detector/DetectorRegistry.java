@@ -14,7 +14,9 @@ public class DetectorRegistry {
                 new AggregateBytecodeDetector(),
                 new ObfuscationDetector(),
                 new ManifestDetector(),
-                new AssetPackagingDetector()
+                new AssetPackagingDetector(),
+                new SecretStringDetector(),
+                new EnvironmentAccessDetector()
         );
     }
 
@@ -26,4 +28,3 @@ public class DetectorRegistry {
         return indicators;
     }
 }
-
