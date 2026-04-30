@@ -10,6 +10,15 @@ export interface Indicator {
   explanation: string;
 }
 
+export interface ArtifactClassification {
+  id: string;
+  label: string;
+  family: string;
+  confidence: number;
+  evidence: string[];
+  explanation: string;
+}
+
 export interface PackageSummary {
   name: string;
   classCount: number;
@@ -47,6 +56,7 @@ export interface JarAnalysisReport {
   summary: string;
   manifest: Record<string, string>;
   behaviorCategories: string[];
+  artifactClassifications: ArtifactClassification[];
   indicators: Indicator[];
   packages: PackageSummary[];
   relationships: ClassRelationship[];

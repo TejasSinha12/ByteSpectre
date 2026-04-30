@@ -1,6 +1,7 @@
 import { Activity, BrainCircuit, DatabaseZap, RadioTower, SearchCode } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AssetIntel } from './components/AssetIntel';
+import { ClassificationPanel } from './components/ClassificationPanel';
 import { GraphPreview } from './components/GraphPreview';
 import { IndicatorTable } from './components/IndicatorTable';
 import { RiskGauge } from './components/RiskGauge';
@@ -112,6 +113,7 @@ export function App() {
 
         {report && (
           <section className="analysis-grid">
+            <ClassificationPanel classifications={report.artifactClassifications} />
             <IndicatorTable indicators={report.indicators} />
             <GraphPreview packages={report.packages} relationships={report.relationships} methodCallEdges={report.methodCallEdges} />
             <AssetIntel findings={report.assetFindings} />
@@ -140,4 +142,3 @@ function Metric({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
-
