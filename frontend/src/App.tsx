@@ -5,12 +5,16 @@ import { CapabilitiesPanel } from './components/CapabilitiesPanel';
 import { CategoryChips } from './components/CategoryChips';
 import { ClassificationPanel } from './components/ClassificationPanel';
 import { DescriptorPanel } from './components/DescriptorPanel';
+import { EmptyWorkbench } from './components/EmptyWorkbench';
 import { GraphPreview } from './components/GraphPreview';
 import { HistoryPanel } from './components/HistoryPanel';
 import { IndicatorTable } from './components/IndicatorTable';
+import { LoadingOverlay } from './components/LoadingOverlay';
 import { RelationshipGraph } from './components/RelationshipGraph';
 import { ReportActions } from './components/ReportActions';
+import { ReportStatusStrip } from './components/ReportStatusStrip';
 import { RiskGauge } from './components/RiskGauge';
+import { SectionTabs } from './components/SectionTabs';
 import { UploadConsole } from './components/UploadConsole';
 import { analyzeJar, analyzeJarPath, fetchCapabilities } from './lib/api';
 import type { AnalysisCapabilities, JarAnalysisReport } from './lib/types';
@@ -105,6 +109,7 @@ export function App() {
         />
 
         {error && <div className="error-banner">{error}</div>}
+        {busy && <LoadingOverlay />}
 
         <section className="dashboard-grid">
           <RiskGauge score={report?.riskScore ?? 0} level={report?.riskLevel ?? 'LOW'} />
@@ -131,24 +136,30 @@ export function App() {
           </section>
         </section>
 
+        {report && <ReportStatusStrip report={report} />}
+        {report && <SectionTabs />}
+        {!report && <EmptyWorkbench />}
+
         {report && (
           <section className="analysis-grid">
-            <ClassificationPanel classifications={report.artifactClassifications} />
-            <HistoryPanel
-              reports={history}
-              onSelect={(item) => {
-                setReport(item);
-                setEvents((current) => [`Restored ${item.fileName} from local history`, ...current].slice(0, 8));
-              }}
-              onClear={() => {
-                localStorage.removeItem(historyKey);
-                setHistory([]);
-              }}
-            />
-            <CapabilitiesPanel capabilities={capabilities} />
-            <IndicatorTable indicators={report.indicators} />
-            <RelationshipGraph relationships={report.relationships} methodCallEdges={report.methodCallEdges} />
-            <DescriptorPanel descriptors={report.descriptorMetadata} />
+            <div id="classification"><ClassificationPanel classifications={report.artifactClassifications} /></div>
+            <div id="history">
+              <HistoryPanel
+                reports={history}
+                onSelect={(item) => {
+                  setReport(item);
+                  setEvents((current) => [`Restored ${item.fileName} from local history`, ...current].slice(0, 8));
+                }}
+                onClear={() => {
+                  localStorage.removeItem(historyKey);
+                  setHistory([]);
+                }}
+              />
+            </div>
+            <div id="capabilities"><CapabilitiesPanel capabilities={capabilities} /></div>
+            <div id="indicators" className="wide-panel"><IndicatorTable indicators={report.indicators} /></div>
+            <div id="relationships" className="wide-panel"><RelationshipGraph relationships={report.relationships} methodCallEdges={report.methodCallEdges} /></div>
+            <div id="descriptors"><DescriptorPanel descriptors={report.descriptorMetadata} /></div>
             <GraphPreview packages={report.packages} relationships={report.relationships} methodCallEdges={report.methodCallEdges} />
             <AssetIntel findings={report.assetFindings} />
             <section className="panel ai-panel">
