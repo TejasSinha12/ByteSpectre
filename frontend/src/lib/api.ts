@@ -1,4 +1,4 @@
-import type { JarAnalysisReport } from './types';
+import type { AnalysisCapabilities, JarAnalysisReport } from './types';
 
 export async function analyzeJar(file: File): Promise<JarAnalysisReport> {
   const form = new FormData();
@@ -21,6 +21,16 @@ export async function analyzeJarPath(path: string): Promise<JarAnalysisReport> {
   const response = await fetch(`/api/analysis/jar/path?${params.toString()}`, {
     method: 'POST'
   });
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response));
+  }
+
+  return response.json();
+}
+
+export async function fetchCapabilities(): Promise<AnalysisCapabilities> {
+  const response = await fetch('/api/analysis/capabilities');
 
   if (!response.ok) {
     throw new Error(await errorMessage(response));

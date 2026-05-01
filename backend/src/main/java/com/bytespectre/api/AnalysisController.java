@@ -29,6 +29,17 @@ public class AnalysisController {
         return new AnalysisHealth("online", "static-engine-v1", "sandbox-runtime-planned");
     }
 
+    @GetMapping("/capabilities")
+    public AnalysisCapabilities capabilities() {
+        return new AnalysisCapabilities(
+                "static-engine-v1",
+                java.util.List.of("Fabric", "Quilt", "Forge", "NeoForge", "Bukkit", "Spigot", "Paper", "Velocity", "BungeeCord", "Minecraft Client", "Java Agent", "Generic JVM"),
+                java.util.List.of("fabric.mod.json", "quilt.mod.json", "mods.toml", "neoforge.mods.toml", "plugin.yml", "paper-plugin.yml", "velocity-plugin.json", "bungee.yml", "mcmod.info"),
+                java.util.List.of("Bytecode", "Obfuscation", "Manifest", "Asset Packaging", "Credential Exposure", "Anti-Analysis", "Filesystem Mutation"),
+                java.util.List.of("json", "markdown")
+        );
+    }
+
     @PostMapping(value = "/jar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public JarAnalysisReport analyzeUpload(@RequestParam("file") MultipartFile file) throws IOException {
         return jarAnalysisService.analyze(file);
@@ -42,4 +53,3 @@ public class AnalysisController {
     public record AnalysisHealth(String status, String staticEngine, String runtimeSandbox) {
     }
 }
-
