@@ -16,7 +16,8 @@ public class DetectorRegistry {
                 new ManifestDetector(),
                 new AssetPackagingDetector(),
                 new SecretStringDetector(),
-                new EnvironmentAccessDetector()
+                new EnvironmentAccessDetector(),
+                new FileSystemMutationDetector()
         );
     }
 
