@@ -17,6 +17,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -68,6 +70,9 @@ public class JarAnalysisService {
         if (!Files.isRegularFile(jarPath)) {
             throw new IOException("JAR path does not point to a file: " + jarPath);
         }
+        if (!fileName.toLowerCase(Locale.ROOT).endsWith(".jar")) {
+            throw new IOException("Only .jar artifacts are supported by the current static analyzer.");
+        }
 
         List<ClassBytecodeFacts> classFacts = new ArrayList<>();
         List<AssetFinding> assetFindings = new ArrayList<>();
@@ -103,7 +108,9 @@ public class JarAnalysisService {
             }
         }
 
-        List<Indicator> indicators = detectorRegistry.detect(new AnalysisContext(classFacts, assetFindings, jarEntryNames, manifest));
+        List<Indicator> indicators = detectorRegistry.detect(new AnalysisContext(classFacts, assetFindings, jarEntryNames, manifest)).stream()
+                .sorted(Comparator.comparing(Indicator::severity).reversed().thenComparing(Indicator::confidence).reversed())
+                .toList();
         List<ArtifactClassification> artifactClassifications = artifactClassifier.classify(classFacts, assetFindings, jarEntryNames, manifest);
         int riskScore = calculateRiskScore(indicators, classFacts, assetFindings);
         RiskLevel riskLevel = riskLevel(riskScore);
@@ -127,6 +134,7 @@ public class JarAnalysisService {
                 UUID.randomUUID().toString(),
                 fileName,
                 Files.size(jarPath),
+                sha256(jarPath),
                 Instant.now(),
                 riskLevel,
                 riskScore,
@@ -143,6 +151,24 @@ public class JarAnalysisService {
                 resourceSummary,
                 aiSignals
         );
+    }
+
+    private String sha256(Path path) throws IOException {
+        try (InputStream input = Files.newInputStream(path)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte value : digest.digest()) {
+                hex.append(String.format("%02x", value));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IOException("SHA-256 digest algorithm is unavailable.", exception);
+        }
     }
 
     private void classifyResource(Map<String, Long> resourceSummary, String name) {

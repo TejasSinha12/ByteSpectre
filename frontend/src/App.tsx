@@ -1,17 +1,19 @@
 import { Activity, BrainCircuit, DatabaseZap, RadioTower, SearchCode } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AssetIntel } from './components/AssetIntel';
+import { CapabilitiesPanel } from './components/CapabilitiesPanel';
 import { CategoryChips } from './components/CategoryChips';
 import { ClassificationPanel } from './components/ClassificationPanel';
 import { DescriptorPanel } from './components/DescriptorPanel';
 import { GraphPreview } from './components/GraphPreview';
+import { HistoryPanel } from './components/HistoryPanel';
 import { IndicatorTable } from './components/IndicatorTable';
 import { RelationshipGraph } from './components/RelationshipGraph';
 import { ReportActions } from './components/ReportActions';
 import { RiskGauge } from './components/RiskGauge';
 import { UploadConsole } from './components/UploadConsole';
-import { analyzeJar, analyzeJarPath } from './lib/api';
-import type { JarAnalysisReport } from './lib/types';
+import { analyzeJar, analyzeJarPath, fetchCapabilities } from './lib/api';
+import type { AnalysisCapabilities, JarAnalysisReport } from './lib/types';
 
 const initialEvents = [
   'Static engine online',
@@ -19,9 +21,12 @@ const initialEvents = [
   'AI feature vector bridge idle',
   'Sandbox instrumentation queue standing by'
 ];
+const historyKey = 'bytespectre.analysisHistory';
 
 export function App() {
   const [report, setReport] = useState<JarAnalysisReport | null>(null);
+  const [history, setHistory] = useState<JarAnalysisReport[]>(() => loadHistory());
+  const [capabilities, setCapabilities] = useState<AnalysisCapabilities | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState(initialEvents);
@@ -33,6 +38,12 @@ export function App() {
     return Object.values(report.resourceSummary).reduce((total, value) => total + value, 0);
   }, [report]);
 
+  useEffect(() => {
+    fetchCapabilities()
+      .then(setCapabilities)
+      .catch(() => setCapabilities(null));
+  }, []);
+
   async function runAnalysis(task: () => Promise<JarAnalysisReport>) {
     setBusy(true);
     setError(null);
@@ -40,6 +51,7 @@ export function App() {
     try {
       const nextReport = await task();
       setReport(nextReport);
+      setHistory((current) => saveHistory([nextReport, ...current.filter((item) => item.sha256 !== nextReport.sha256)].slice(0, 8)));
       setEvents((current) => [
         `Analysis ${nextReport.analysisId.slice(0, 8)} completed with ${nextReport.riskLevel} posture`,
         `${nextReport.indicators.length} indicators and ${nextReport.assetFindings.length} asset signals produced`,
@@ -106,6 +118,7 @@ export function App() {
               <Metric label="Indicators" value={report?.indicators.length ?? 0} />
               <Metric label="Categories" value={report?.behaviorCategories.length ?? 0} />
             </div>
+            {report && <code className="hash-line">SHA-256 {report.sha256}</code>}
           </section>
           <section className="panel event-feed">
             <p className="eyebrow">Realtime event feed</p>
@@ -121,6 +134,18 @@ export function App() {
         {report && (
           <section className="analysis-grid">
             <ClassificationPanel classifications={report.artifactClassifications} />
+            <HistoryPanel
+              reports={history}
+              onSelect={(item) => {
+                setReport(item);
+                setEvents((current) => [`Restored ${item.fileName} from local history`, ...current].slice(0, 8));
+              }}
+              onClear={() => {
+                localStorage.removeItem(historyKey);
+                setHistory([]);
+              }}
+            />
+            <CapabilitiesPanel capabilities={capabilities} />
             <IndicatorTable indicators={report.indicators} />
             <RelationshipGraph relationships={report.relationships} methodCallEdges={report.methodCallEdges} />
             <DescriptorPanel descriptors={report.descriptorMetadata} />
@@ -141,6 +166,19 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function loadHistory(): JarAnalysisReport[] {
+  try {
+    return JSON.parse(localStorage.getItem(historyKey) ?? '[]') as JarAnalysisReport[];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(history: JarAnalysisReport[]) {
+  localStorage.setItem(historyKey, JSON.stringify(history));
+  return history;
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

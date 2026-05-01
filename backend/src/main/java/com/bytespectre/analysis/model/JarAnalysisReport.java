@@ -8,6 +8,7 @@ public record JarAnalysisReport(
         String analysisId,
         String fileName,
         long fileSizeBytes,
+        String sha256,
         Instant analyzedAt,
         RiskLevel riskLevel,
         int riskScore,

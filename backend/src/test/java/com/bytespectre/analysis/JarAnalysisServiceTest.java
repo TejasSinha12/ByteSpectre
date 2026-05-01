@@ -26,6 +26,7 @@ class JarAnalysisServiceTest {
         JarAnalysisReport report = service().analyze(jar);
 
         assertThat(report.fileName()).endsWith(".jar");
+        assertThat(report.sha256()).hasSize(64);
         assertThat(report.resourceSummary()).containsEntry("translations", 1L);
         assertThat(report.assetFindings()).isNotEmpty();
     }

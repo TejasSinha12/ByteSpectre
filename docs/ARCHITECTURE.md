@@ -81,3 +81,7 @@ Current families:
 This taxonomy should grow independently from suspicious behavior detectors. A plugin or mod can be perfectly benign, while malware-like behavior can appear in any family.
 
 Descriptor metadata is extracted separately from classification. Known descriptor formats such as `fabric.mod.json`, `quilt.mod.json`, `mods.toml`, `plugin.yml`, `paper-plugin.yml`, `velocity-plugin.json`, and `bungee.yml` are parsed into compact key/value fields for UI inspection and future AI feature enrichment.
+
+## Artifact Identity
+
+Every static report includes the file name, size, and SHA-256 digest of the analyzed JAR. The digest is used by the workbench to deduplicate local history entries and should become the stable join key for persisted reports, sandbox runs, AI classifications, and future threat-intelligence lookups.

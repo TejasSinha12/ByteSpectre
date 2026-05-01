@@ -56,6 +56,7 @@ export interface JarAnalysisReport {
   analysisId: string;
   fileName: string;
   fileSizeBytes: number;
+  sha256: string;
   analyzedAt: string;
   riskLevel: RiskLevel;
   riskScore: number;
@@ -71,4 +72,12 @@ export interface JarAnalysisReport {
   assetFindings: AssetFinding[];
   resourceSummary: Record<string, number>;
   aiSignals: Record<string, unknown>;
+}
+
+export interface AnalysisCapabilities {
+  staticEngineVersion: string;
+  artifactFamilies: string[];
+  descriptorFormats: string[];
+  detectorFamilies: string[];
+  exportFormats: string[];
 }
