@@ -1,11 +1,14 @@
 package com.bytespectre.api;
 
 import com.bytespectre.analysis.model.JarAnalysisReport;
+import com.bytespectre.analysis.service.DecompileService;
 import com.bytespectre.analysis.service.JarAnalysisService;
 import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
 import java.nio.file.Path;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,9 +22,11 @@ import org.springframework.web.multipart.MultipartFile;
 @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"})
 public class AnalysisController {
     private final JarAnalysisService jarAnalysisService;
+    private final DecompileService decompileService;
 
-    public AnalysisController(JarAnalysisService jarAnalysisService) {
+    public AnalysisController(JarAnalysisService jarAnalysisService, DecompileService decompileService) {
         this.jarAnalysisService = jarAnalysisService;
+        this.decompileService = decompileService;
     }
 
     @GetMapping("/health")
@@ -43,6 +48,41 @@ public class AnalysisController {
     @PostMapping(value = "/jar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public JarAnalysisReport analyzeUpload(@RequestParam("file") MultipartFile file) throws IOException {
         return jarAnalysisService.analyze(file);
+    }
+
+    @PostMapping(value = "/jar/decompile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = "application/zip")
+    public ResponseEntity<byte[]> decompileUpload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(name = "deobfuscate", defaultValue = "false") boolean deobfuscate
+    ) throws IOException {
+        java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("bytespectre-decompile-", ".jar");
+        file.transferTo(tempFile);
+        try {
+            byte[] zip = decompileService.decompileJarToZip(tempFile, deobfuscate);
+            String base = (file.getOriginalFilename() == null ? "artifact" : file.getOriginalFilename()).replaceAll("\\.jar$", "");
+            String name = base + (deobfuscate ? "-deobf" : "-decompile") + ".zip";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+                    .contentType(org.springframework.http.MediaType.parseMediaType("application/zip"))
+                    .body(zip);
+        } finally {
+            java.nio.file.Files.deleteIfExists(tempFile);
+        }
+    }
+
+    @PostMapping(value = "/jar/path/decompile", produces = "application/zip")
+    public ResponseEntity<byte[]> decompilePath(
+            @RequestParam @NotBlank String path,
+            @RequestParam(name = "deobfuscate", defaultValue = "false") boolean deobfuscate
+    ) throws IOException {
+        java.nio.file.Path jarPath = java.nio.file.Path.of(path);
+        byte[] zip = decompileService.decompileJarToZip(jarPath, deobfuscate);
+        String base = jarPath.getFileName().toString().replaceAll("\\.jar$", "");
+        String name = base + (deobfuscate ? "-deobf" : "-decompile") + ".zip";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/zip"))
+                .body(zip);
     }
 
     @PostMapping("/jar/path")
