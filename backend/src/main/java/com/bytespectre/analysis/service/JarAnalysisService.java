@@ -41,6 +41,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class JarAnalysisService {
     private static final int MAX_CLASS_BYTES = 12 * 1024 * 1024;
+    private static final int RAW_SCAN_LIMIT = 2 * 1024 * 1024;
     private final BytecodeFactExtractor extractor = new BytecodeFactExtractor();
     private final DetectorRegistry detectorRegistry;
     private final ArtifactClassifier artifactClassifier;
@@ -81,6 +82,7 @@ public class JarAnalysisService {
         Map<String, String> manifest = new LinkedHashMap<>();
         List<String> jarEntryNames = new ArrayList<>();
         List<DescriptorMetadata> descriptorMetadata = new ArrayList<>();
+        List<ChannelFinding> fallbackChannelFindings = new ArrayList<>();
 
         try (JarFile jar = new JarFile(jarPath.toFile())) {
             Manifest jarManifest = jar.getManifest();
@@ -93,17 +95,27 @@ public class JarAnalysisService {
                 jarEntryNames.add(entry.getName());
                 classifyResource(resourceSummary, entry.getName());
                 inspectAsset(entry.getName(), assetFindings);
-                if (descriptorMetadataExtractor.isDescriptor(entry.getName())) {
+                boolean isDescriptor = descriptorMetadataExtractor.isDescriptor(entry.getName());
+                boolean isClass = entry.getName().endsWith(".class") && entry.getSize() <= MAX_CLASS_BYTES;
+                boolean isChannelCarrier = looksLikeChannelCarrier(entry.getName());
+                if (isDescriptor || isClass || isChannelCarrier) {
+                    byte[] entryBytes;
                     try (InputStream input = jar.getInputStream(entry)) {
-                        descriptorMetadata.add(descriptorMetadataExtractor.extract(entry.getName(), input.readAllBytes()));
+                        entryBytes = input.readAllBytes();
                     }
-                }
 
-                if (entry.getName().endsWith(".class") && entry.getSize() <= MAX_CLASS_BYTES) {
-                    try (InputStream input = jar.getInputStream(entry)) {
-                        classFacts.add(extractor.extract(input.readAllBytes()));
-                    } catch (RuntimeException ignored) {
-                        assetFindings.add(new AssetFinding(entry.getName(), "class", "Unreadable bytecode", "ASM could not parse this class; it may be packed, corrupted, or intentionally malformed."));
+                    if (isDescriptor) {
+                        descriptorMetadata.add(descriptorMetadataExtractor.extract(entry.getName(), entryBytes));
+                    }
+                    if (isClass) {
+                        try {
+                            classFacts.add(extractor.extract(entryBytes));
+                        } catch (RuntimeException ignored) {
+                            assetFindings.add(new AssetFinding(entry.getName(), "class", "Unreadable bytecode", "ASM could not parse this class; it may be packed, corrupted, or intentionally malformed."));
+                        }
+                    }
+                    if (isChannelCarrier) {
+                        fallbackChannelFindings.addAll(extractChannelFindingsFromRawBytes(entry.getName(), entryBytes));
                     }
                 }
             }
@@ -130,6 +142,9 @@ public class JarAnalysisService {
 
         List<ChannelFinding> channelFindings = classFacts.stream()
                 .flatMap(facts -> facts.channelFindings().stream())
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        channelFindings.addAll(fallbackChannelFindings);
+        channelFindings = channelFindings.stream()
                 .distinct()
                 .limit(200)
                 .toList();
@@ -319,5 +334,74 @@ public class JarAnalysisService {
             }
         }
         return false;
+    }
+
+    private static boolean looksLikeChannelCarrier(String entryName) {
+        String lowered = entryName.toLowerCase(Locale.ROOT);
+        return lowered.endsWith(".class")
+                || lowered.endsWith(".json")
+                || lowered.endsWith(".toml")
+                || lowered.endsWith(".yml")
+                || lowered.endsWith(".yaml")
+                || lowered.endsWith(".properties")
+                || lowered.endsWith(".lang")
+                || lowered.endsWith(".txt")
+                || lowered.endsWith(".mcmeta")
+                || containsAny(lowered, "fabric.mod.json", "plugin.yml", "velocity-plugin.json", "bungee.yml", "mods.toml", "neoforge.mods.toml", "mixin");
+    }
+
+    private List<ChannelFinding> extractChannelFindingsFromRawBytes(String entryName, byte[] classBytes) {
+        if (classBytes == null || classBytes.length == 0 || classBytes.length > RAW_SCAN_LIMIT) {
+            return List.of();
+        }
+        String ascii = new String(classBytes, java.nio.charset.StandardCharsets.ISO_8859_1);
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\b[A-Za-z0-9_.-]{2,48}:[A-Za-z0-9_./-]{1,120}\\b");
+        java.util.regex.Matcher matcher = pattern.matcher(ascii);
+        String sourceClass = entryName.endsWith(".class")
+                ? entryName.substring(0, entryName.length() - 6).replace('/', '.')
+                : entryName;
+        String sourceMethod = entryName.endsWith(".class") ? "<raw-bytes>" : "<resource-bytes>";
+        String system = entryName.endsWith(".class") ? "raw-bytecode-channel" : "raw-resource-channel";
+        List<ChannelFinding> findings = new ArrayList<>();
+        int matched = 0;
+        while (matcher.find() && matched < 24) {
+            String channel = matcher.group();
+            if (!isLikelyPluginChannel(channel)) {
+                continue;
+            }
+            findings.add(new ChannelFinding(system, "unknown", channel, sourceClass, sourceMethod));
+            matched++;
+        }
+        return findings;
+    }
+
+    private static boolean isLikelyPluginChannel(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        if (!value.contains(":")) {
+            return false;
+        }
+        if (containsAny(value, "http:", "https:", "urn:")) {
+            return false;
+        }
+        if (containsAny(value.toLowerCase(Locale.ROOT),
+                "textures/", "texture/", "models/", "lang/", "assets/", "shaders/", "sounds/",
+                ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".ogg", ".wav", ".mp3", ".json", ".mcmeta")) {
+            return false;
+        }
+        String[] parts = value.split(":", 2);
+        if (parts.length != 2) {
+            return false;
+        }
+        String namespace = parts[0];
+        String path = parts[1];
+        if (!namespace.matches("[A-Za-z0-9_.-]{2,48}")) {
+            return false;
+        }
+        if (!path.matches("[A-Za-z0-9_./-]{1,120}")) {
+            return false;
+        }
+        return true;
     }
 }

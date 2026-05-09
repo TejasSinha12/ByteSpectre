@@ -27,10 +27,18 @@ public class DecompileService {
             // Deobfuscation-lite: CFR can't recover original names without mappings, but it can make output more readable.
             // Note: most rename flags are gated behind --rename. (See CFR --help for details.)
             options.put("rename", "true");
+            options.put("antiobf", "true");
+            options.put("constobf", "true");
+            options.put("obfattr", "true");
+            options.put("obfcontrol", "true");
+            options.put("usenametable", "false");
             options.put("renameillegalidents", "true");
             options.put("renamedupmembers", "true");
             options.put("renameenumidents", "true");
             options.put("renamesmallmembers", "3");
+            options.put("forcetopsort", "true");
+            options.put("forcetopsortaggress", "true");
+            options.put("recover", "true");
         }
 
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();

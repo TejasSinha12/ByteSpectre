@@ -88,8 +88,19 @@ Every static report includes the file name, size, and SHA-256 digest of the anal
 
 ## Decompile & Deobfuscate
 
-ByteSpectre exposes CFR-based source export endpoints that return a ZIP archive of decompiled sources. The optional "deobfuscate" mode is currently "rename-lite": CFR can rename illegal identifiers and small members to improve readability, but it cannot recover original symbols without a mapping file (CFR supports mappings via its `obfuscationpath` option, which can be integrated later).
+ByteSpectre exposes CFR-based source export endpoints that return a ZIP archive of decompiled sources. The optional "deobfuscate" mode enables CFR anti-obfuscation and rename/recovery options (`rename`, `antiobf`, illegal/small-member renaming, aggressive topsort/recover) to improve readability. It still cannot recover original symbols without a mapping file (CFR supports mappings via `obfuscationpath`, which can be integrated later).
 
 ## Channel Surface
 
-For Minecraft plugins and mods, ByteSpectre attempts to surface "channel" usage from static bytecode. The current implementation extracts Bukkit plugin messaging channels when the channel identifier is passed as a literal string into `registerIncomingPluginChannel` or `registerOutgoingPluginChannel`, and also records namespaced channel strings like `namespace:path` when present.
+For Minecraft plugins and mods, ByteSpectre attempts to surface "channel" usage from static artifacts.
+
+Current extraction layers:
+
+- Bytecode callsite extraction for Bukkit plugin messaging (`registerIncomingPluginChannel` / `registerOutgoingPluginChannel`) and Fabric-style networking registration methods.
+- Identifier construction heuristics (for example `Identifier.of(namespace, path)` style patterns).
+- Fallback raw-byte scans across class/resource entries for channel-like identifiers when classes are unreadable, packed, or malformed.
+
+Important limitations:
+
+- Static extraction can still miss runtime-built/encrypted channel identifiers.
+- Raw-byte fallback findings are lower-confidence and can include non-protocol strings that happen to match `namespace:path` patterns.

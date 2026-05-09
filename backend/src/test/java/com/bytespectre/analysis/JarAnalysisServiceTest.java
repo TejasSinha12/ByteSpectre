@@ -92,6 +92,27 @@ class JarAnalysisServiceTest {
         assertThat(report.behaviorCategories()).contains("Minecraft Server Plugin");
     }
 
+    @Test
+    void extractsNamespacedChannelsFromUnreadableClassBytes() throws Exception {
+        Path jar = Files.createTempFile("bytespectre-unreadable-class-test-", ".jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+            output.putNextEntry(new JarEntry("com/example/Broken.class"));
+            output.write("not-a-valid-class voicechat:state fabric:recipe_sync marlowcrystal:version".getBytes());
+            output.closeEntry();
+        }
+
+        JarAnalysisReport report = service().analyze(jar);
+
+        assertThat(report.channelFindings())
+                .anySatisfy(channel -> {
+                    assertThat(channel.system()).isEqualTo("raw-bytecode-channel");
+                    assertThat(channel.channel()).isEqualTo("voicechat:state");
+                    assertThat(channel.sourceClass()).isEqualTo("com.example.Broken");
+                });
+        assertThat(report.assetFindings())
+                .anySatisfy(asset -> assertThat(asset.signal()).isEqualTo("Unreadable bytecode"));
+    }
+
     private JarAnalysisService service() {
         return new JarAnalysisService(new DetectorRegistry(), new ArtifactClassifier(), new DescriptorMetadataExtractor());
     }

@@ -20,8 +20,8 @@ The first implementation delivers a runnable foundation:
 - Inspect bytecode with ASM for reflection, classloader usage, networking, instrumentation, native calls, packet/client hints, inheritance, and method-call edges.
 - Produce risk scoring, suspicious indicators, behavior categories, and explanation text.
 - Extract plugin/mod descriptors (Fabric/Quilt/Forge/NeoForge, Bukkit/Paper, Velocity/Bungee) and surface key fields.
-- Extract plugin/mod channels when detectable (Bukkit plugin messaging registrations and namespaced channel strings).
-- Decompile JARs to a downloadable source ZIP (CFR) with an optional "deobfuscation-lite" mode for improved readability.
+- Extract plugin/mod channels when detectable from bytecode callsites (Bukkit/Fabric patterns) and fallback raw scans for channel-like identifiers in packed/unreadable artifacts.
+- Decompile JARs to a downloadable source ZIP (CFR) with an optional deobfuscation mode that enables CFR anti-obfuscation and rename/recovery options for better readability.
 - Render an enterprise-style analysis dashboard with live event feed, risk breakdown, asset intelligence, and graph-oriented data panels.
 
 ## Run
@@ -70,9 +70,15 @@ From the UI:
 
 - Use `JSON` / `Markdown` to export reports.
 - Use `Decompile ZIP` to download decompiled sources as a ZIP.
-- Use `Deobfuscate ZIP` for CFR identifier renaming and small-member renaming (readability improvement, not original-name recovery).
+- Use `Deobfuscate ZIP` for CFR anti-obfuscation and rename/recovery options (readability improvement, not original-name recovery).
 
 API:
 
 - `POST /api/analysis/jar/decompile?deobfuscate=false|true` (multipart upload, returns ZIP)
 - `POST /api/analysis/jar/path/decompile?path=/abs/file.jar&deobfuscate=false|true` (returns ZIP)
+
+## Channel Detection Notes
+
+- Channel results are static-analysis evidence and can include fallback candidates from raw bytes when classes are unreadable.
+- Entries shaped like `namespace:path` are stronger signals; obfuscated/runtime-built channels may still be missed.
+- Runtime-only registration can require sandbox/runtime tracing for exact channel enumeration.

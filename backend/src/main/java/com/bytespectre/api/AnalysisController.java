@@ -19,7 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/analysis")
-@CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"})
+@CrossOrigin(originPatterns = {"http://localhost:*", "http://127.0.0.1:*"})
 public class AnalysisController {
     private final JarAnalysisService jarAnalysisService;
     private final DecompileService decompileService;
