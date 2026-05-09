@@ -1,4 +1,4 @@
-import { Boxes, Braces, GitBranch, History, Radar, ShieldAlert } from 'lucide-react';
+import { Boxes, Braces, GitBranch, History, Radar, Radio, ShieldAlert } from 'lucide-react';
 
 const sections = [
   { href: '#classification', label: 'Classify', icon: Boxes },
@@ -6,7 +6,8 @@ const sections = [
   { href: '#capabilities', label: 'Engine', icon: Radar },
   { href: '#indicators', label: 'Indicators', icon: ShieldAlert },
   { href: '#relationships', label: 'Graph', icon: GitBranch },
-  { href: '#descriptors', label: 'Metadata', icon: Braces }
+  { href: '#descriptors', label: 'Metadata', icon: Braces },
+  { href: '#channels', label: 'Channels', icon: Radio }
 ];
 
 export function SectionTabs() {
@@ -21,4 +22,3 @@ export function SectionTabs() {
     </nav>
   );
 }
-

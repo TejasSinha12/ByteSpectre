@@ -177,7 +177,7 @@ export function App() {
             <div id="indicators" className="wide-panel"><IndicatorTable indicators={report.indicators} /></div>
             <div id="relationships" className="wide-panel"><RelationshipGraph relationships={report.relationships} methodCallEdges={report.methodCallEdges} /></div>
             <div id="descriptors"><DescriptorPanel descriptors={report.descriptorMetadata} /></div>
-            <ChannelsPanel report={report} />
+            <div id="channels"><ChannelsPanel report={report} /></div>
             <GraphPreview packages={report.packages} relationships={report.relationships} methodCallEdges={report.methodCallEdges} />
             <AssetIntel findings={report.assetFindings} />
             <section className="panel ai-panel">
