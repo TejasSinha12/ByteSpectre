@@ -11,6 +11,9 @@ import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 public class BytecodeFactExtractor {
     public ClassBytecodeFacts extract(byte[] classBytes) {
         ClassReader reader = new ClassReader(classBytes);
@@ -43,21 +46,19 @@ public class BytecodeFactExtractor {
     private void inspectMethod(ClassBytecodeFacts facts, MethodNode method) {
         String sourceMethod = method.name + method.desc;
         String lastString = null;
+        Deque<String> recentStrings = new ArrayDeque<>();
+        Deque<String> recentChannelCandidates = new ArrayDeque<>();
         for (AbstractInsnNode instruction : method.instructions) {
             if (instruction instanceof LdcInsnNode ldc && ldc.cst instanceof String value) {
                 lastString = value;
+                pushRecent(recentStrings, value);
                 inspectString(facts, value);
                 continue;
             }
             if (instruction instanceof MethodInsnNode call) {
                 inspectCall(facts, sourceMethod, call);
-                maybeCaptureChannel(facts, sourceMethod, call, lastString);
+                maybeCaptureChannel(facts, sourceMethod, call, lastString, recentStrings, recentChannelCandidates);
                 lastString = null;
-            } else {
-                // Reset once we move past the load and it wasn't immediately consumed by an invoke.
-                if (instruction.getOpcode() != -1) {
-                    lastString = null;
-                }
             }
         }
     }
@@ -93,21 +94,156 @@ public class BytecodeFactExtractor {
         }
     }
 
-    private void maybeCaptureChannel(ClassBytecodeFacts facts, String sourceMethod, MethodInsnNode call, String lastString) {
-        if (lastString == null || lastString.isBlank() || lastString.length() > 80) {
-            return;
-        }
+    private void maybeCaptureChannel(
+            ClassBytecodeFacts facts,
+            String sourceMethod,
+            MethodInsnNode call,
+            String lastString,
+            Deque<String> recentStrings,
+            Deque<String> recentChannelCandidates
+    ) {
         String owner = internalToJava(call.owner);
-        if (owner.equals("org.bukkit.plugin.messaging.Messenger") || owner.equals("org.bukkit.plugin.messaging.StandardMessenger")) {
-            if (call.name.equals("registerOutgoingPluginChannel")) {
-                facts.channelFindings().add(new ChannelFinding("bukkit-plugin-messaging", "outgoing", lastString, facts.className(), sourceMethod));
-            } else if (call.name.equals("registerIncomingPluginChannel")) {
-                facts.channelFindings().add(new ChannelFinding("bukkit-plugin-messaging", "incoming", lastString, facts.className(), sourceMethod));
+        String channelCandidate = resolveChannelCandidate(lastString, recentStrings, recentChannelCandidates);
+
+        if (isIdentifierFactoryCall(owner, call.name)) {
+            String identifierChannel = resolveIdentifierChannel(recentStrings);
+            if (identifierChannel != null) {
+                pushRecent(recentChannelCandidates, identifierChannel);
+                addChannelFindingUnique(
+                        facts,
+                        new ChannelFinding("minecraft-plugin-channel", "unknown", identifierChannel, facts.className(), sourceMethod)
+                );
             }
         }
-        // Heuristic: recognize Minecraft namespaced plugin channels in string literals.
-        if (lastString.contains(":") && lastString.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
-            facts.channelFindings().add(new ChannelFinding("minecraft-plugin-channel", "unknown", lastString, facts.className(), sourceMethod));
+
+        if (owner.equals("org.bukkit.plugin.messaging.Messenger") || owner.equals("org.bukkit.plugin.messaging.StandardMessenger")) {
+            if (call.name.equals("registerOutgoingPluginChannel") && channelCandidate != null) {
+                addChannelFindingUnique(
+                        facts,
+                        new ChannelFinding("bukkit-plugin-messaging", "outgoing", channelCandidate, facts.className(), sourceMethod)
+                );
+            } else if (call.name.equals("registerIncomingPluginChannel") && channelCandidate != null) {
+                addChannelFindingUnique(
+                        facts,
+                        new ChannelFinding("bukkit-plugin-messaging", "incoming", channelCandidate, facts.className(), sourceMethod)
+                );
+            }
+        }
+
+        if (isFabricChannelRegistrationCall(owner, call.name) && channelCandidate != null) {
+            addChannelFindingUnique(
+                    facts,
+                    new ChannelFinding("fabric-networking", inferFabricDirection(owner, call.name), channelCandidate, facts.className(), sourceMethod)
+            );
+        }
+
+        // Heuristic: recognize Minecraft namespaced plugin channels in nearby string literals.
+        if (channelCandidate != null && looksLikeNamespacedChannel(channelCandidate)) {
+            addChannelFindingUnique(
+                    facts,
+                    new ChannelFinding("minecraft-plugin-channel", "unknown", channelCandidate, facts.className(), sourceMethod)
+            );
+        }
+    }
+
+    private static boolean isIdentifierFactoryCall(String owner, String methodName) {
+        return owner.equals("net.minecraft.util.Identifier")
+                && (methodName.equals("of")
+                || methodName.equals("tryParse")
+                || methodName.equals("fromNamespaceAndPath")
+                || methodName.equals("<init>"));
+    }
+
+    private static boolean isFabricChannelRegistrationCall(String owner, String methodName) {
+        if (!containsAny(owner, "fabricmc.fabric.api.networking", "fabric.api.networking")) {
+            return false;
+        }
+        return containsAny(methodName, "register", "receiver", "handler", "payload", "channel");
+    }
+
+    private static String inferFabricDirection(String owner, String methodName) {
+        String lowered = (owner + "." + methodName).toLowerCase();
+        if (lowered.contains("server")) {
+            return "incoming";
+        }
+        if (lowered.contains("client")) {
+            return "outgoing";
+        }
+        if (lowered.contains("c2s")) {
+            return "incoming";
+        }
+        if (lowered.contains("s2c")) {
+            return "outgoing";
+        }
+        return "unknown";
+    }
+
+    private static String resolveIdentifierChannel(Deque<String> recentStrings) {
+        String[] values = recentStrings.toArray(new String[0]);
+        if (values.length >= 2) {
+            String namespace = values[values.length - 2];
+            String path = values[values.length - 1];
+            if (looksLikeIdentifierParts(namespace, path)) {
+                return namespace + ":" + path;
+            }
+        }
+        String last = values.length > 0 ? values[values.length - 1] : null;
+        return looksLikeNamespacedChannel(last) ? last : null;
+    }
+
+    private static boolean looksLikeIdentifierParts(String namespace, String path) {
+        if (namespace == null || path == null) {
+            return false;
+        }
+        return namespace.matches("[a-z0-9_.-]+") && path.matches("[a-z0-9_./-]+");
+    }
+
+    private static String resolveChannelCandidate(String lastString, Deque<String> recentStrings, Deque<String> recentChannelCandidates) {
+        if (looksLikeNamespacedChannel(lastString)) {
+            return lastString;
+        }
+        String derived = resolveIdentifierChannel(recentStrings);
+        if (derived != null) {
+            return derived;
+        }
+        for (String candidate : recentChannelCandidates) {
+            if (looksLikeNamespacedChannel(candidate)) {
+                return candidate;
+            }
+        }
+        String fallback = lastString == null ? null : lastString.trim();
+        if (fallback == null || fallback.isBlank() || fallback.length() > 120) {
+            return null;
+        }
+        return fallback;
+    }
+
+    private static boolean looksLikeNamespacedChannel(String value) {
+        return value != null
+                && value.length() <= 120
+                && value.contains(":")
+                && value.matches("[a-z0-9_.-]+:[a-z0-9_./-]+");
+    }
+
+    private static void pushRecent(Deque<String> values, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        values.addLast(value);
+        while (values.size() > 8) {
+            values.removeFirst();
+        }
+    }
+
+    private static void addChannelFindingUnique(ClassBytecodeFacts facts, ChannelFinding candidate) {
+        boolean exists = facts.channelFindings().stream().anyMatch(existing ->
+                existing.system().equals(candidate.system())
+                        && existing.direction().equals(candidate.direction())
+                        && existing.channel().equals(candidate.channel())
+                        && existing.sourceClass().equals(candidate.sourceClass())
+                        && existing.sourceMethod().equals(candidate.sourceMethod()));
+        if (!exists) {
+            facts.channelFindings().add(candidate);
         }
     }
 
