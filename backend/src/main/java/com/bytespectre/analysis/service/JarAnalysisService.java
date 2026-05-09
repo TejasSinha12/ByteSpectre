@@ -7,6 +7,7 @@ import com.bytespectre.analysis.detector.DetectorRegistry;
 import com.bytespectre.analysis.model.ArtifactClassification;
 import com.bytespectre.analysis.model.AssetFinding;
 import com.bytespectre.analysis.model.ClassRelationship;
+import com.bytespectre.analysis.model.ChannelFinding;
 import com.bytespectre.analysis.model.DescriptorMetadata;
 import com.bytespectre.analysis.model.Indicator;
 import com.bytespectre.analysis.model.JarAnalysisReport;
@@ -127,6 +128,12 @@ public class JarAnalysisService {
                 .limit(1200)
                 .toList();
 
+        List<ChannelFinding> channelFindings = classFacts.stream()
+                .flatMap(facts -> facts.channelFindings().stream())
+                .distinct()
+                .limit(200)
+                .toList();
+
         Map<String, Object> aiSignals = aiReadySignals(classFacts, indicators, assetFindings);
         String summary = summarize(fileName, classFacts.size(), indicators, riskLevel);
 
@@ -143,6 +150,7 @@ public class JarAnalysisService {
                 categories,
                 artifactClassifications,
                 descriptorMetadata,
+                channelFindings,
                 indicators,
                 packages,
                 relationships,

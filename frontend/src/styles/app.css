@@ -157,6 +157,34 @@ nav a[aria-disabled="true"] {
   color: #d7eee9;
 }
 
+.channels-list {
+  display: grid;
+  gap: 10px;
+}
+
+.channels-list article {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 12px;
+}
+
+.channels-list strong,
+.channels-list span,
+.channels-list code {
+  display: block;
+}
+
+.channels-list span {
+  color: #96a6b0;
+  margin-top: 4px;
+}
+
+.channels-list code {
+  color: #d7eee9;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  opacity: 0.9;
+}
+
 .workspace {
   padding: 30px;
   min-width: 0;

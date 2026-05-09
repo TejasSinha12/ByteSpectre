@@ -4,6 +4,7 @@ import { AssetIntel } from './components/AssetIntel';
 import { CapabilitiesPanel } from './components/CapabilitiesPanel';
 import { CategoryChips } from './components/CategoryChips';
 import { ClassificationPanel } from './components/ClassificationPanel';
+import { ChannelsPanel } from './components/ChannelsPanel';
 import { DescriptorPanel } from './components/DescriptorPanel';
 import { DocsPage } from './components/DocsPage';
 import { EmptyWorkbench } from './components/EmptyWorkbench';
@@ -176,6 +177,7 @@ export function App() {
             <div id="indicators" className="wide-panel"><IndicatorTable indicators={report.indicators} /></div>
             <div id="relationships" className="wide-panel"><RelationshipGraph relationships={report.relationships} methodCallEdges={report.methodCallEdges} /></div>
             <div id="descriptors"><DescriptorPanel descriptors={report.descriptorMetadata} /></div>
+            <ChannelsPanel report={report} />
             <GraphPreview packages={report.packages} relationships={report.relationships} methodCallEdges={report.methodCallEdges} />
             <AssetIntel findings={report.assetFindings} />
             <section className="panel ai-panel">

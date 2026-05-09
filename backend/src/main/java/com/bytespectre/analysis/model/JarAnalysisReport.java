@@ -17,6 +17,7 @@ public record JarAnalysisReport(
         List<String> behaviorCategories,
         List<ArtifactClassification> artifactClassifications,
         List<DescriptorMetadata> descriptorMetadata,
+        java.util.List<ChannelFinding> channelFindings,
         List<Indicator> indicators,
         List<PackageSummary> packages,
         List<ClassRelationship> relationships,

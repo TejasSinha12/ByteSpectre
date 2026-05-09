@@ -65,6 +65,13 @@ export interface JarAnalysisReport {
   behaviorCategories: string[];
   artifactClassifications: ArtifactClassification[];
   descriptorMetadata: DescriptorMetadata[];
+  channelFindings: {
+    system: string;
+    direction: string;
+    channel: string;
+    sourceClass: string;
+    sourceMethod: string;
+  }[];
   indicators: Indicator[];
   packages: PackageSummary[];
   relationships: ClassRelationship[];

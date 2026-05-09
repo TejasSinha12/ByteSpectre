@@ -1,6 +1,7 @@
 package com.bytespectre.analysis.bytecode;
 
 import com.bytespectre.analysis.model.ClassRelationship;
+import com.bytespectre.analysis.model.ChannelFinding;
 import com.bytespectre.analysis.model.MethodCallEdge;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +15,7 @@ public class ClassBytecodeFacts {
     private final List<String> stringConstants = new ArrayList<>();
     private final List<ClassRelationship> relationships = new ArrayList<>();
     private final List<MethodCallEdge> methodCalls = new ArrayList<>();
+    private final List<ChannelFinding> channelFindings = new ArrayList<>();
     private boolean usesReflection;
     private boolean usesClassLoader;
     private boolean usesInstrumentation;
@@ -72,6 +74,10 @@ public class ClassBytecodeFacts {
 
     public List<MethodCallEdge> methodCalls() {
         return methodCalls;
+    }
+
+    public List<ChannelFinding> channelFindings() {
+        return channelFindings;
     }
 
     public boolean usesReflection() {
@@ -146,4 +152,3 @@ public class ClassBytecodeFacts {
         this.hasMixinSignals = hasMixinSignals;
     }
 }
-

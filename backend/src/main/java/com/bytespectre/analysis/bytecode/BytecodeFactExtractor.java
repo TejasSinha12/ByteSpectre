@@ -1,6 +1,7 @@
 package com.bytespectre.analysis.bytecode;
 
 import com.bytespectre.analysis.model.ClassRelationship;
+import com.bytespectre.analysis.model.ChannelFinding;
 import com.bytespectre.analysis.model.MethodCallEdge;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
@@ -41,11 +42,22 @@ public class BytecodeFactExtractor {
 
     private void inspectMethod(ClassBytecodeFacts facts, MethodNode method) {
         String sourceMethod = method.name + method.desc;
+        String lastString = null;
         for (AbstractInsnNode instruction : method.instructions) {
+            if (instruction instanceof LdcInsnNode ldc && ldc.cst instanceof String value) {
+                lastString = value;
+                inspectString(facts, value);
+                continue;
+            }
             if (instruction instanceof MethodInsnNode call) {
                 inspectCall(facts, sourceMethod, call);
-            } else if (instruction instanceof LdcInsnNode ldc && ldc.cst instanceof String value) {
-                inspectString(facts, value);
+                maybeCaptureChannel(facts, sourceMethod, call, lastString);
+                lastString = null;
+            } else {
+                // Reset once we move past the load and it wasn't immediately consumed by an invoke.
+                if (instruction.getOpcode() != -1) {
+                    lastString = null;
+                }
             }
         }
     }
@@ -81,6 +93,24 @@ public class BytecodeFactExtractor {
         }
     }
 
+    private void maybeCaptureChannel(ClassBytecodeFacts facts, String sourceMethod, MethodInsnNode call, String lastString) {
+        if (lastString == null || lastString.isBlank() || lastString.length() > 80) {
+            return;
+        }
+        String owner = internalToJava(call.owner);
+        if (owner.equals("org.bukkit.plugin.messaging.Messenger") || owner.equals("org.bukkit.plugin.messaging.StandardMessenger")) {
+            if (call.name.equals("registerOutgoingPluginChannel")) {
+                facts.channelFindings().add(new ChannelFinding("bukkit-plugin-messaging", "outgoing", lastString, facts.className(), sourceMethod));
+            } else if (call.name.equals("registerIncomingPluginChannel")) {
+                facts.channelFindings().add(new ChannelFinding("bukkit-plugin-messaging", "incoming", lastString, facts.className(), sourceMethod));
+            }
+        }
+        // Heuristic: recognize Minecraft namespaced plugin channels in string literals.
+        if (lastString.contains(":") && lastString.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
+            facts.channelFindings().add(new ChannelFinding("minecraft-plugin-channel", "unknown", lastString, facts.className(), sourceMethod));
+        }
+    }
+
     private void inspectString(ClassBytecodeFacts facts, String value) {
         if (value.length() > 2 && facts.stringConstants().size() < 500) {
             facts.stringConstants().add(value);
@@ -108,4 +138,3 @@ public class BytecodeFactExtractor {
         return value == null ? "" : value.replace('/', '.');
     }
 }
-
