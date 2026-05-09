@@ -24,10 +24,13 @@ public class DecompileService {
         options.put("outputencoding", "UTF-8");
         options.put("comments", "false");
         if (deobfuscate) {
-            // Deobfuscation-lite: identifier cleanup + duplicate member rename for readability.
+            // Deobfuscation-lite: CFR can't recover original names without mappings, but it can make output more readable.
+            // Note: most rename flags are gated behind --rename. (See CFR --help for details.)
+            options.put("rename", "true");
             options.put("renameillegalidents", "true");
             options.put("renamedupmembers", "true");
-            options.put("renamebadmembers", "true");
+            options.put("renameenumidents", "true");
+            options.put("renamesmallmembers", "3");
         }
 
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
