@@ -14,7 +14,7 @@ This roadmap is optimized for daily small commits while still moving the platfor
 
 ## Middle Term
 
-- Add CFR/FernFlower/Procyon decompiler adapters.
+- Add FernFlower/Procyon decompiler adapters and CFR mapping-based deobfuscation (`obfuscationpath` support).
 - Add deeper Fabric, Forge, NeoForge, Quilt, Paper, Velocity, and Bungee descriptor parsing.
 - Add packet, Netty pipeline, and protocol decoder detectors.
 - Feed static vectors into the AI service and store model outputs.

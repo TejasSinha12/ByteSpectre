@@ -20,7 +20,7 @@ ByteSpectre is organized around an event-driven JVM analysis pipeline.
 
 ## Expansion Points
 
-- Decompiler adapters for CFR, FernFlower, and Procyon.
+- Decompiler adapters for FernFlower and Procyon, plus deeper CFR mapping support.
 - Netty protocol tracing and packet decoder plugins.
 - Java agent probes for reflection, class loading, instrumentation, native loading, and process spawning.
 - Signature marketplace and threat intelligence feeds.
@@ -85,3 +85,11 @@ Descriptor metadata is extracted separately from classification. Known descripto
 ## Artifact Identity
 
 Every static report includes the file name, size, and SHA-256 digest of the analyzed JAR. The digest is used by the workbench to deduplicate local history entries and should become the stable join key for persisted reports, sandbox runs, AI classifications, and future threat-intelligence lookups.
+
+## Decompile & Deobfuscate
+
+ByteSpectre exposes CFR-based source export endpoints that return a ZIP archive of decompiled sources. The optional "deobfuscate" mode is currently "rename-lite": CFR can rename illegal identifiers and small members to improve readability, but it cannot recover original symbols without a mapping file (CFR supports mappings via its `obfuscationpath` option, which can be integrated later).
+
+## Channel Surface
+
+For Minecraft plugins and mods, ByteSpectre attempts to surface "channel" usage from static bytecode. The current implementation extracts Bukkit plugin messaging channels when the channel identifier is passed as a literal string into `registerIncomingPluginChannel` or `registerOutgoingPluginChannel`, and also records namespaced channel strings like `namespace:path` when present.

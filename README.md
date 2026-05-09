@@ -19,6 +19,9 @@ The first implementation delivers a runnable foundation:
 - Parse JAR metadata, manifests, class counts, package inventory, resources, and translation/assets.
 - Inspect bytecode with ASM for reflection, classloader usage, networking, instrumentation, native calls, packet/client hints, inheritance, and method-call edges.
 - Produce risk scoring, suspicious indicators, behavior categories, and explanation text.
+- Extract plugin/mod descriptors (Fabric/Quilt/Forge/NeoForge, Bukkit/Paper, Velocity/Bungee) and surface key fields.
+- Extract plugin/mod channels when detectable (Bukkit plugin messaging registrations and namespaced channel strings).
+- Decompile JARs to a downloadable source ZIP (CFR) with an optional "deobfuscation-lite" mode for improved readability.
 - Render an enterprise-style analysis dashboard with live event feed, risk breakdown, asset intelligence, and graph-oriented data panels.
 
 ## Run
@@ -60,3 +63,16 @@ java -javaagent:target/bytespectre-sandbox-agent-0.1.0-SNAPSHOT.jar -jar /path/t
 ```
 
 The frontend expects the backend at `http://localhost:8080`.
+
+## Decompile / Export
+
+From the UI:
+
+- Use `JSON` / `Markdown` to export reports.
+- Use `Decompile ZIP` to download decompiled sources as a ZIP.
+- Use `Deobfuscate ZIP` for CFR identifier renaming and small-member renaming (readability improvement, not original-name recovery).
+
+API:
+
+- `POST /api/analysis/jar/decompile?deobfuscate=false|true` (multipart upload, returns ZIP)
+- `POST /api/analysis/jar/path/decompile?path=/abs/file.jar&deobfuscate=false|true` (returns ZIP)
