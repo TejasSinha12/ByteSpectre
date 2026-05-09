@@ -5,6 +5,7 @@ import { CapabilitiesPanel } from './components/CapabilitiesPanel';
 import { CategoryChips } from './components/CategoryChips';
 import { ClassificationPanel } from './components/ClassificationPanel';
 import { DescriptorPanel } from './components/DescriptorPanel';
+import { DocsPage } from './components/DocsPage';
 import { EmptyWorkbench } from './components/EmptyWorkbench';
 import { GraphPreview } from './components/GraphPreview';
 import { HistoryPanel } from './components/HistoryPanel';
@@ -28,9 +29,12 @@ const initialEvents = [
 const historyKey = 'bytespectre.analysisHistory';
 
 export function App() {
+  const [view, setView] = useState<'analysis' | 'docs'>('analysis');
   const [report, setReport] = useState<JarAnalysisReport | null>(null);
   const [history, setHistory] = useState<JarAnalysisReport[]>(() => loadHistory());
   const [capabilities, setCapabilities] = useState<AnalysisCapabilities | null>(null);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [sourcePath, setSourcePath] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState(initialEvents);
@@ -81,14 +85,18 @@ export function App() {
           </div>
         </div>
         <nav>
-          <a className="active"><Activity size={18} /> Analysis</a>
-          <a><BrainCircuit size={18} /> AI Signals</a>
-          <a><RadioTower size={18} /> Runtime Sandbox</a>
-          <a><DatabaseZap size={18} /> Intelligence</a>
+          <a className={view === 'analysis' ? 'active' : ''} onClick={() => setView('analysis')} role="button" tabIndex={0}><Activity size={18} /> Analysis</a>
+          <a className={view === 'docs' ? 'active' : ''} onClick={() => setView('docs')} role="button" tabIndex={0}><DatabaseZap size={18} /> Docs</a>
+          <a aria-disabled="true"><BrainCircuit size={18} /> AI Signals</a>
+          <a aria-disabled="true"><RadioTower size={18} /> Runtime Sandbox</a>
         </nav>
       </aside>
 
       <section className="workspace">
+        {view === 'docs' ? (
+          <DocsPage />
+        ) : (
+        <>
         <header className="topbar">
           <div>
             <p className="eyebrow">AI-powered Java reverse engineering and security platform</p>
@@ -100,12 +108,20 @@ export function App() {
           </div>
         </header>
 
-        <ReportActions report={report} />
+        <ReportActions report={report} sourceFile={sourceFile} sourcePath={sourcePath} />
 
         <UploadConsole
           busy={busy}
-          onUpload={(file) => runAnalysis(() => analyzeJar(file))}
-          onPath={(path) => runAnalysis(() => analyzeJarPath(path))}
+          onUpload={(file) => {
+            setSourceFile(file);
+            setSourcePath(null);
+            runAnalysis(() => analyzeJar(file));
+          }}
+          onPath={(path) => {
+            setSourceFile(null);
+            setSourcePath(path);
+            runAnalysis(() => analyzeJarPath(path));
+          }}
         />
 
         {error && <div className="error-banner">{error}</div>}
@@ -173,6 +189,8 @@ export function App() {
               <pre>{JSON.stringify(report.aiSignals, null, 2)}</pre>
             </section>
           </section>
+        )}
+        </>
         )}
       </section>
     </main>

@@ -75,12 +75,86 @@ nav a {
   padding: 11px 12px;
   border-radius: 8px;
   text-decoration: none;
+  cursor: pointer;
 }
 
 nav a.active,
 nav a:hover {
   background: rgba(102, 217, 199, 0.12);
   color: #f4fbfb;
+}
+
+nav a[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.docs-page header {
+  margin-bottom: 18px;
+}
+
+.docs-title {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.docs-title svg {
+  color: #66d9c7;
+}
+
+.docs-page h1 {
+  margin: 4px 0 0;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1;
+}
+
+.docs-lead {
+  color: #b8c7cf;
+  line-height: 1.6;
+  margin: 16px 0 0;
+  max-width: 72ch;
+}
+
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.docs-grid article {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(15, 22, 29, 0.82);
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.docs-grid h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.06rem;
+  margin: 0 0 10px;
+}
+
+.docs-grid p {
+  color: #96a6b0;
+  margin: 0 0 12px;
+  line-height: 1.55;
+}
+
+.docs-grid ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #c6d7d5;
+}
+
+.docs-grid li {
+  margin: 6px 0;
+}
+
+.docs-grid code {
+  color: #d7eee9;
 }
 
 .workspace {
@@ -154,6 +228,7 @@ nav a:hover {
   justify-content: flex-end;
   gap: 9px;
   margin: -8px 0 16px;
+  flex-wrap: wrap;
 }
 
 .report-actions button {
@@ -920,6 +995,10 @@ nav a:hover {
   .dashboard-grid,
   .analysis-grid,
   .empty-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .docs-grid {
     grid-template-columns: 1fr;
   }
 
