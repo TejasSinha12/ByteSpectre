@@ -40,17 +40,17 @@ public class BytecodeFactExtractor {
         facts.hasMinecraftSignals(containsAny(node.name, "minecraft", "net/minecraft", "bukkit", "spigot", "fabricmc", "forge"));
         facts.hasMixinSignals(containsAny(node.name, "mixin", "inject", "accessor"));
 
-        Map<String, String> staticFieldChannels = new HashMap<>();
+        Map<String, StackValue> staticFieldConstants = new HashMap<>();
 
         // Two-pass: harvest static channel constants from <clinit> first, then look for usages.
         for (MethodNode method : node.methods) {
             if ("<clinit>".equals(method.name)) {
-                inspectMethod(facts, method, staticFieldChannels);
+                inspectMethod(facts, method, staticFieldConstants);
             }
         }
         for (MethodNode method : node.methods) {
             if (!"<clinit>".equals(method.name)) {
-                inspectMethod(facts, method, staticFieldChannels);
+                inspectMethod(facts, method, staticFieldConstants);
             }
         }
 
@@ -58,7 +58,7 @@ public class BytecodeFactExtractor {
         return facts;
     }
 
-    private void inspectMethod(ClassBytecodeFacts facts, MethodNode method, Map<String, String> staticFieldChannels) {
+    private void inspectMethod(ClassBytecodeFacts facts, MethodNode method, Map<String, StackValue> staticFieldConstants) {
         String sourceMethod = method.name + method.desc;
         String lastString = null;
         Deque<String> recentStrings = new ArrayDeque<>();
@@ -84,7 +84,7 @@ public class BytecodeFactExtractor {
                 continue;
             }
             if (instruction instanceof FieldInsnNode fieldInsn) {
-                handleFieldInsn(valueStack, staticFieldChannels, facts, sourceMethod, fieldInsn);
+                handleFieldInsn(valueStack, staticFieldConstants, facts, sourceMethod, fieldInsn);
                 continue;
             }
             if (instruction instanceof MethodInsnNode call) {
@@ -250,7 +250,7 @@ public class BytecodeFactExtractor {
 
     private static void handleFieldInsn(
             Deque<StackValue> valueStack,
-            Map<String, String> staticFieldChannels,
+            Map<String, StackValue> staticFieldConstants,
             ClassBytecodeFacts facts,
             String sourceMethod,
             FieldInsnNode fieldInsn
@@ -258,9 +258,9 @@ public class BytecodeFactExtractor {
         String owner = internalToJava(fieldInsn.owner);
         String fieldKey = owner + "." + fieldInsn.name + ":" + fieldInsn.desc;
         if (fieldInsn.getOpcode() == Opcodes.GETSTATIC) {
-            String channel = staticFieldChannels.get(fieldKey);
-            if (channel != null) {
-                valueStack.addLast(StackValue.channel(channel));
+            StackValue constant = staticFieldConstants.get(fieldKey);
+            if (constant != null) {
+                valueStack.addLast(constant);
             } else {
                 valueStack.addLast(StackValue.unknown());
             }
@@ -268,12 +268,14 @@ public class BytecodeFactExtractor {
         }
         if (fieldInsn.getOpcode() == Opcodes.PUTSTATIC) {
             StackValue top = pollLast(valueStack);
-            if (top != null && top.kind == StackKind.CHANNEL) {
-                staticFieldChannels.put(fieldKey, top.value);
-                addChannelFindingUnique(
-                        facts,
-                        new ChannelFinding("minecraft-plugin-channel", "unknown", top.value, facts.className(), sourceMethod)
-                );
+            if (top != null && (top.kind == StackKind.CHANNEL || top.kind == StackKind.STRING)) {
+                staticFieldConstants.put(fieldKey, top);
+                if (top.kind == StackKind.CHANNEL) {
+                    addChannelFindingUnique(
+                            facts,
+                            new ChannelFinding("minecraft-plugin-channel", "unknown", top.value, facts.className(), sourceMethod)
+                    );
+                }
             }
             return;
         }

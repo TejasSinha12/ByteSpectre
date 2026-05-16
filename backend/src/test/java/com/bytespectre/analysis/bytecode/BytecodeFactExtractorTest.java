@@ -53,6 +53,16 @@ class BytecodeFactExtractorTest {
                 });
     }
 
+    @Test
+    void capturesFabricChannelWhenIdentifierUsesStaticModIdString() {
+        byte[] classBytes = buildFabricIdentifierFromStaticModIdClass();
+
+        ClassBytecodeFacts facts = new BytecodeFactExtractor().extract(classBytes);
+
+        assertThat(facts.channelFindings())
+                .anySatisfy(finding -> assertThat(finding.channel()).isEqualTo("voicechat:state"));
+    }
+
     private static byte[] buildFabricRegistrationClass() {
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, "test/FabricChannelSample", null, "java/lang/Object", null);
@@ -123,6 +133,47 @@ class BytecodeFactExtractorTest {
         MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "register", "()V", null, null);
         method.visitCode();
         method.visitFieldInsn(Opcodes.GETSTATIC, "test/FabricStaticIdentifierSample", "CHAN", "Lnet/minecraft/util/Identifier;");
+        method.visitInsn(Opcodes.ACONST_NULL);
+        method.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                "net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking",
+                "registerGlobalReceiver",
+                "(Lnet/minecraft/util/Identifier;Ljava/lang/Object;)V",
+                false
+        );
+        method.visitInsn(Opcodes.RETURN);
+        method.visitMaxs(0, 0);
+        method.visitEnd();
+
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
+    private static byte[] buildFabricIdentifierFromStaticModIdClass() {
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC, "test/FabricModIdIdentifierSample", null, "java/lang/Object", null);
+
+        writer.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC, "MODID", "Ljava/lang/String;", null, null).visitEnd();
+        writer.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC, "CHAN", "Lnet/minecraft/util/Identifier;", null, null).visitEnd();
+
+        MethodVisitor clinit = writer.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
+        clinit.visitCode();
+        clinit.visitLdcInsn("voicechat");
+        clinit.visitFieldInsn(Opcodes.PUTSTATIC, "test/FabricModIdIdentifierSample", "MODID", "Ljava/lang/String;");
+
+        clinit.visitTypeInsn(Opcodes.NEW, "net/minecraft/util/Identifier");
+        clinit.visitInsn(Opcodes.DUP);
+        clinit.visitFieldInsn(Opcodes.GETSTATIC, "test/FabricModIdIdentifierSample", "MODID", "Ljava/lang/String;");
+        clinit.visitLdcInsn("state");
+        clinit.visitMethodInsn(Opcodes.INVOKESPECIAL, "net/minecraft/util/Identifier", "<init>", "(Ljava/lang/String;Ljava/lang/String;)V", false);
+        clinit.visitFieldInsn(Opcodes.PUTSTATIC, "test/FabricModIdIdentifierSample", "CHAN", "Lnet/minecraft/util/Identifier;");
+        clinit.visitInsn(Opcodes.RETURN);
+        clinit.visitMaxs(0, 0);
+        clinit.visitEnd();
+
+        MethodVisitor method = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "register", "()V", null, null);
+        method.visitCode();
+        method.visitFieldInsn(Opcodes.GETSTATIC, "test/FabricModIdIdentifierSample", "CHAN", "Lnet/minecraft/util/Identifier;");
         method.visitInsn(Opcodes.ACONST_NULL);
         method.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
