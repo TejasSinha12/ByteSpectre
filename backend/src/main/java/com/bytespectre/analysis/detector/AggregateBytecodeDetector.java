@@ -13,6 +13,7 @@ class AggregateBytecodeDetector implements JarDetector {
         addAggregateIndicator(indicators, context.classFacts(), ClassBytecodeFacts::usesClassLoader, "classloader", "Dynamic class loading", "Custom class loading can unpack payloads, inject classes, or bypass static discovery.", 5, 84);
         addAggregateIndicator(indicators, context.classFacts(), ClassBytecodeFacts::usesInstrumentation, "instrumentation", "JVM instrumentation API", "Instrumentation hooks can redefine classes, trace runtime behavior, or modify application execution.", 6, 88);
         addAggregateIndicator(indicators, context.classFacts(), ClassBytecodeFacts::usesNetworking, "networking", "Network behavior", "Network APIs indicate runtime communication that should be inspected in sandbox mode.", 4, 76);
+        addAggregateIndicator(indicators, context.classFacts(), ClassBytecodeFacts::usesCryptography, "crypto", "Cryptography usage", "Crypto APIs are common in legitimate software but also used to encrypt payloads, strings, configs, and network traffic.", 4, 70);
         addAggregateIndicator(indicators, context.classFacts(), ClassBytecodeFacts::usesNativeAccess, "native", "Native library loading", "Native access can evade JVM-level controls and should be isolated.", 7, 92);
         addAggregateIndicator(indicators, context.classFacts(), ClassBytecodeFacts::usesProcessExecution, "process", "Process execution", "Launching host processes is high-risk behavior for untrusted JARs.", 8, 94);
         addAggregateIndicator(indicators, context.classFacts(), ClassBytecodeFacts::hasPacketSignals, "packet", "Packet or protocol manipulation", "Bytecode and strings suggest packet flow, Netty pipeline, or protocol manipulation.", 4, 72);
@@ -36,4 +37,3 @@ class AggregateBytecodeDetector implements JarDetector {
         boolean matches(ClassBytecodeFacts facts);
     }
 }
-

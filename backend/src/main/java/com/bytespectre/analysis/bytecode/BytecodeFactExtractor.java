@@ -112,6 +112,13 @@ public class BytecodeFactExtractor {
         if (owner.startsWith("java.net") || owner.startsWith("javax.net") || owner.startsWith("io.netty") || owner.contains("WebSocket")) {
             facts.usesNetworking(true);
         }
+        if (owner.startsWith("javax.crypto")
+                || owner.startsWith("java.security")
+                || owner.startsWith("javax.security")
+                || ownerAndName.contains("Cipher.getInstance")
+                || ownerAndName.contains("MessageDigest.getInstance")) {
+            facts.usesCryptography(true);
+        }
         if (ownerAndName.equals("java.lang.System.load") || ownerAndName.equals("java.lang.System.loadLibrary")) {
             facts.usesNativeAccess(true);
         }

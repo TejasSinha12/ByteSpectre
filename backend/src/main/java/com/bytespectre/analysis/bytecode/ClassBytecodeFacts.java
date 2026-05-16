@@ -22,6 +22,7 @@ public class ClassBytecodeFacts {
     private boolean usesNetworking;
     private boolean usesNativeAccess;
     private boolean usesProcessExecution;
+    private boolean usesCryptography;
     private boolean hasPacketSignals;
     private boolean hasMinecraftSignals;
     private boolean hasMixinSignals;
@@ -126,6 +127,14 @@ public class ClassBytecodeFacts {
 
     public void usesProcessExecution(boolean usesProcessExecution) {
         this.usesProcessExecution = usesProcessExecution;
+    }
+
+    public boolean usesCryptography() {
+        return usesCryptography;
+    }
+
+    public void usesCryptography(boolean usesCryptography) {
+        this.usesCryptography = usesCryptography;
     }
 
     public boolean hasPacketSignals() {
