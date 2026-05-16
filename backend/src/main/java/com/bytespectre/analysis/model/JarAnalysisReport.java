@@ -24,6 +24,8 @@ public record JarAnalysisReport(
         List<MethodCallEdge> methodCallEdges,
         List<AssetFinding> assetFindings,
         Map<String, Long> resourceSummary,
+        List<EndpointFinding> endpointFindings,
+        List<DependencyArtifact> dependencies,
         Map<String, Object> aiSignals
 ) {
 }

@@ -9,6 +9,8 @@ import com.bytespectre.analysis.model.AssetFinding;
 import com.bytespectre.analysis.model.ClassRelationship;
 import com.bytespectre.analysis.model.ChannelFinding;
 import com.bytespectre.analysis.model.DescriptorMetadata;
+import com.bytespectre.analysis.model.DependencyArtifact;
+import com.bytespectre.analysis.model.EndpointFinding;
 import com.bytespectre.analysis.model.Indicator;
 import com.bytespectre.analysis.model.JarAnalysisReport;
 import com.bytespectre.analysis.model.MethodCallEdge;
@@ -151,6 +153,8 @@ public class JarAnalysisService {
 
         Map<String, Object> aiSignals = aiReadySignals(classFacts, indicators, assetFindings);
         String summary = summarize(fileName, classFacts.size(), indicators, riskLevel);
+        List<EndpointFinding> endpointFindings = List.of();
+        List<DependencyArtifact> dependencies = List.of();
 
         return new JarAnalysisReport(
                 UUID.randomUUID().toString(),
@@ -172,6 +176,8 @@ public class JarAnalysisService {
                 methodCallEdges,
                 assetFindings,
                 resourceSummary,
+                endpointFindings,
+                dependencies,
                 aiSignals
         );
     }

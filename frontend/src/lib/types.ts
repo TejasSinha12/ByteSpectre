@@ -52,6 +52,21 @@ export interface AssetFinding {
   explanation: string;
 }
 
+export interface EndpointFinding {
+  kind: string;
+  value: string;
+  evidence: string;
+  confidence: number;
+}
+
+export interface DependencyArtifact {
+  path: string;
+  name: string;
+  version: string;
+  sizeBytes: number;
+  source: string;
+}
+
 export interface JarAnalysisReport {
   analysisId: string;
   fileName: string;
@@ -78,6 +93,8 @@ export interface JarAnalysisReport {
   methodCallEdges: MethodCallEdge[];
   assetFindings: AssetFinding[];
   resourceSummary: Record<string, number>;
+  endpointFindings: EndpointFinding[];
+  dependencies: DependencyArtifact[];
   aiSignals: Record<string, unknown>;
 }
 
