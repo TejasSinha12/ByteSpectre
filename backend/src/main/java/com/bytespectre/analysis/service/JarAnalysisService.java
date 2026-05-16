@@ -31,11 +31,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.function.Predicate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -44,6 +47,10 @@ import org.springframework.web.multipart.MultipartFile;
 public class JarAnalysisService {
     private static final int MAX_CLASS_BYTES = 12 * 1024 * 1024;
     private static final int RAW_SCAN_LIMIT = 2 * 1024 * 1024;
+    private static final Pattern URL_PATTERN = Pattern.compile("(?i)\\bhttps?://[a-z0-9\\-._~%:/?#\\[\\]@!$&'()*+,;=]+");
+    private static final Pattern IPV4_PATTERN = Pattern.compile("\\b(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\b");
+    private static final Pattern WEBHOOK_PATTERN = Pattern.compile("(?i)https?://(?:canary\\.)?discord(?:app)?\\.com/api/webhooks/\\d+/[a-z0-9_\\-]+");
+    private static final Pattern BASE64_BLOB_PATTERN = Pattern.compile("\\b[A-Za-z0-9+/]{80,}={0,2}\\b");
     private final BytecodeFactExtractor extractor = new BytecodeFactExtractor();
     private final DetectorRegistry detectorRegistry;
     private final ArtifactClassifier artifactClassifier;
@@ -85,6 +92,7 @@ public class JarAnalysisService {
         List<String> jarEntryNames = new ArrayList<>();
         List<DescriptorMetadata> descriptorMetadata = new ArrayList<>();
         List<ChannelFinding> fallbackChannelFindings = new ArrayList<>();
+        List<DependencyArtifact> dependencies = new ArrayList<>();
 
         try (JarFile jar = new JarFile(jarPath.toFile())) {
             Manifest jarManifest = jar.getManifest();
@@ -97,10 +105,12 @@ public class JarAnalysisService {
                 jarEntryNames.add(entry.getName());
                 classifyResource(resourceSummary, entry.getName());
                 inspectAsset(entry.getName(), assetFindings);
+                maybeCaptureDependencyEntry(dependencies, entry);
                 boolean isDescriptor = descriptorMetadataExtractor.isDescriptor(entry.getName());
                 boolean isClass = entry.getName().endsWith(".class") && entry.getSize() <= MAX_CLASS_BYTES;
                 boolean isChannelCarrier = looksLikeChannelCarrier(entry.getName());
-                if (isDescriptor || isClass || isChannelCarrier) {
+                boolean isPomProperties = entry.getName().startsWith("META-INF/maven/") && entry.getName().endsWith("pom.properties");
+                if (isDescriptor || isClass || isChannelCarrier || isPomProperties) {
                     byte[] entryBytes;
                     try (InputStream input = jar.getInputStream(entry)) {
                         entryBytes = input.readAllBytes();
@@ -108,6 +118,12 @@ public class JarAnalysisService {
 
                     if (isDescriptor) {
                         descriptorMetadata.add(descriptorMetadataExtractor.extract(entry.getName(), entryBytes));
+                    }
+                    if (isPomProperties) {
+                        DependencyArtifact artifact = parsePomProperties(entry.getName(), entry.getSize(), entryBytes);
+                        if (artifact != null) {
+                            dependencies.add(artifact);
+                        }
                     }
                     if (isClass) {
                         try {
@@ -151,10 +167,10 @@ public class JarAnalysisService {
                 .limit(200)
                 .toList();
 
+        List<EndpointFinding> endpointFindings = extractEndpointFindings(classFacts, assetFindings);
+        dependencies = dependencies.stream().distinct().limit(400).toList();
         Map<String, Object> aiSignals = aiReadySignals(classFacts, indicators, assetFindings);
         String summary = summarize(fileName, classFacts.size(), indicators, riskLevel);
-        List<EndpointFinding> endpointFindings = List.of();
-        List<DependencyArtifact> dependencies = List.of();
 
         return new JarAnalysisReport(
                 UUID.randomUUID().toString(),
@@ -180,6 +196,101 @@ public class JarAnalysisService {
                 dependencies,
                 aiSignals
         );
+    }
+
+    private void maybeCaptureDependencyEntry(List<DependencyArtifact> dependencies, JarEntry entry) {
+        String name = entry.getName();
+        String lowered = name.toLowerCase(Locale.ROOT);
+        if (!lowered.endsWith(".jar")) {
+            return;
+        }
+        if (lowered.startsWith("boot-inf/lib/") || lowered.startsWith("web-inf/lib/") || lowered.startsWith("lib/")) {
+            String file = name.substring(name.lastIndexOf('/') + 1);
+            String version = guessVersionFromFilename(file);
+            dependencies.add(new DependencyArtifact(name, stripJarSuffix(file), version, Math.max(0, entry.getSize()), "embedded-jar"));
+        }
+    }
+
+    private DependencyArtifact parsePomProperties(String path, long size, byte[] bytes) {
+        try {
+            Properties props = new Properties();
+            props.load(new java.io.ByteArrayInputStream(bytes));
+            String groupId = props.getProperty("groupId", "").trim();
+            String artifactId = props.getProperty("artifactId", "").trim();
+            String version = props.getProperty("version", "").trim();
+            if (artifactId.isBlank()) {
+                return null;
+            }
+            String name = groupId.isBlank() ? artifactId : groupId + ":" + artifactId;
+            return new DependencyArtifact(path, name, version.isBlank() ? "unknown" : version, Math.max(0, size), "maven-metadata");
+        } catch (RuntimeException | IOException ignored) {
+            return null;
+        }
+    }
+
+    private List<EndpointFinding> extractEndpointFindings(List<ClassBytecodeFacts> classFacts, List<AssetFinding> assets) {
+        Map<String, EndpointFinding> deduped = new LinkedHashMap<>();
+        for (ClassBytecodeFacts facts : classFacts) {
+            for (String value : facts.stringConstants()) {
+                if (value == null || value.isBlank()) {
+                    continue;
+                }
+                scanEndpointString(deduped, value, "string-constant");
+            }
+        }
+        for (AssetFinding finding : assets) {
+            scanEndpointString(deduped, finding.path(), "asset-path");
+        }
+        return deduped.values().stream().limit(200).toList();
+    }
+
+    private void scanEndpointString(Map<String, EndpointFinding> out, String value, String evidence) {
+        if (value.length() > 800) {
+            return;
+        }
+        Matcher webhook = WEBHOOK_PATTERN.matcher(value);
+        while (webhook.find()) {
+            String found = webhook.group();
+            out.putIfAbsent("webhook:" + found, new EndpointFinding("discord-webhook", found, evidence, 90));
+        }
+        Matcher url = URL_PATTERN.matcher(value);
+        while (url.find()) {
+            String found = url.group();
+            int confidence = found.toLowerCase(Locale.ROOT).contains("localhost") ? 40 : 70;
+            out.putIfAbsent("url:" + found, new EndpointFinding("url", found, evidence, confidence));
+        }
+        Matcher ip = IPV4_PATTERN.matcher(value);
+        while (ip.find()) {
+            String found = ip.group();
+            out.putIfAbsent("ip:" + found, new EndpointFinding("ipv4", found, evidence, 65));
+        }
+        Matcher b64 = BASE64_BLOB_PATTERN.matcher(value);
+        if (b64.find() && !value.contains("-----BEGIN")) {
+            String blob = b64.group();
+            String preview = blob.length() <= 120 ? blob : blob.substring(0, 120) + "...";
+            out.putIfAbsent("b64:" + preview, new EndpointFinding("base64-blob", preview, evidence, 55));
+        }
+    }
+
+    private static String stripJarSuffix(String file) {
+        return file == null ? "" : file.replaceAll("(?i)\\.jar$", "");
+    }
+
+    private static String guessVersionFromFilename(String file) {
+        if (file == null) {
+            return "unknown";
+        }
+        String base = stripJarSuffix(file);
+        // Simple heuristic: last dash-separated token with a digit.
+        int dash = base.lastIndexOf('-');
+        if (dash <= 0 || dash >= base.length() - 1) {
+            return "unknown";
+        }
+        String candidate = base.substring(dash + 1);
+        if (candidate.matches(".*\\d.*") && candidate.length() <= 40) {
+            return candidate;
+        }
+        return "unknown";
     }
 
     private String sha256(Path path) throws IOException {
