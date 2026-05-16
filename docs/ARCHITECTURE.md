@@ -97,7 +97,7 @@ For Minecraft plugins and mods, ByteSpectre attempts to surface "channel" usage 
 Current extraction layers:
 
 - Bytecode callsite extraction for Bukkit plugin messaging (`registerIncomingPluginChannel` / `registerOutgoingPluginChannel`) and Fabric-style networking registration methods.
-- Identifier construction heuristics (for example `Identifier.of(namespace, path)` style patterns).
+- Identifier/ResourceLocation construction heuristics (for example `Identifier.of(namespace, path)`, `new Identifier(namespace, path)`, `new ResourceLocation(namespace, path)`), including static-field harvesting from `<clinit>` for common mod patterns.
 - Fallback raw-byte scans across class/resource entries for channel-like identifiers when classes are unreadable, packed, or malformed.
 
 Important limitations:

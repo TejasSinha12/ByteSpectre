@@ -20,7 +20,7 @@ The first implementation delivers a runnable foundation:
 - Inspect bytecode with ASM for reflection, classloader usage, networking, instrumentation, native calls, packet/client hints, inheritance, and method-call edges.
 - Produce risk scoring, suspicious indicators, behavior categories, and explanation text.
 - Extract plugin/mod descriptors (Fabric/Quilt/Forge/NeoForge, Bukkit/Paper, Velocity/Bungee) and surface key fields.
-- Extract plugin/mod channels when detectable from bytecode callsites (Bukkit/Fabric patterns) and fallback raw scans for channel-like identifiers in packed/unreadable artifacts.
+- Extract plugin/mod channels when detectable from bytecode callsites (Bukkit/Fabric/Forge-style patterns), including common `Identifier` / `ResourceLocation` construction and static-field harvesting, plus fallback raw scans for channel-like identifiers in packed/unreadable artifacts.
 - Decompile JARs to a downloadable source ZIP (CFR) with an optional deobfuscation mode that enables CFR anti-obfuscation and rename/recovery options for better readability.
 - Render an enterprise-style analysis dashboard with live event feed, risk breakdown, asset intelligence, and graph-oriented data panels.
 

@@ -7,12 +7,17 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
+import java.util.Map;
 
 public class BytecodeFactExtractor {
     public ClassBytecodeFacts extract(byte[] classBytes) {
@@ -35,29 +40,56 @@ public class BytecodeFactExtractor {
         facts.hasMinecraftSignals(containsAny(node.name, "minecraft", "net/minecraft", "bukkit", "spigot", "fabricmc", "forge"));
         facts.hasMixinSignals(containsAny(node.name, "mixin", "inject", "accessor"));
 
+        Map<String, String> staticFieldChannels = new HashMap<>();
+
+        // Two-pass: harvest static channel constants from <clinit> first, then look for usages.
         for (MethodNode method : node.methods) {
-            inspectMethod(facts, method);
+            if ("<clinit>".equals(method.name)) {
+                inspectMethod(facts, method, staticFieldChannels);
+            }
+        }
+        for (MethodNode method : node.methods) {
+            if (!"<clinit>".equals(method.name)) {
+                inspectMethod(facts, method, staticFieldChannels);
+            }
         }
 
         facts.stringConstantCount(facts.stringConstants().size());
         return facts;
     }
 
-    private void inspectMethod(ClassBytecodeFacts facts, MethodNode method) {
+    private void inspectMethod(ClassBytecodeFacts facts, MethodNode method, Map<String, String> staticFieldChannels) {
         String sourceMethod = method.name + method.desc;
         String lastString = null;
         Deque<String> recentStrings = new ArrayDeque<>();
         Deque<String> recentChannelCandidates = new ArrayDeque<>();
+        Deque<StackValue> valueStack = new ArrayDeque<>();
         for (AbstractInsnNode instruction : method.instructions) {
             if (instruction instanceof LdcInsnNode ldc && ldc.cst instanceof String value) {
                 lastString = value;
                 pushRecent(recentStrings, value);
                 inspectString(facts, value);
+                valueStack.addLast(StackValue.string(value));
+                continue;
+            }
+            if (instruction instanceof TypeInsnNode typeInsn && typeInsn.getOpcode() == Opcodes.NEW) {
+                valueStack.addLast(StackValue.object(internalToJava(typeInsn.desc)));
+                continue;
+            }
+            if (instruction instanceof InsnNode insn && insn.getOpcode() == Opcodes.DUP) {
+                StackValue top = valueStack.peekLast();
+                if (top != null) {
+                    valueStack.addLast(top);
+                }
+                continue;
+            }
+            if (instruction instanceof FieldInsnNode fieldInsn) {
+                handleFieldInsn(valueStack, staticFieldChannels, facts, sourceMethod, fieldInsn);
                 continue;
             }
             if (instruction instanceof MethodInsnNode call) {
                 inspectCall(facts, sourceMethod, call);
-                maybeCaptureChannel(facts, sourceMethod, call, lastString, recentStrings, recentChannelCandidates);
+                maybeCaptureChannel(facts, sourceMethod, call, lastString, recentStrings, recentChannelCandidates, valueStack);
                 lastString = null;
             }
         }
@@ -100,20 +132,19 @@ public class BytecodeFactExtractor {
             MethodInsnNode call,
             String lastString,
             Deque<String> recentStrings,
-            Deque<String> recentChannelCandidates
+            Deque<String> recentChannelCandidates,
+            Deque<StackValue> valueStack
     ) {
         String owner = internalToJava(call.owner);
         String channelCandidate = resolveChannelCandidate(lastString, recentStrings, recentChannelCandidates);
 
-        if (isIdentifierFactoryCall(owner, call.name)) {
-            String identifierChannel = resolveIdentifierChannel(recentStrings);
-            if (identifierChannel != null) {
-                pushRecent(recentChannelCandidates, identifierChannel);
-                addChannelFindingUnique(
-                        facts,
-                        new ChannelFinding("minecraft-plugin-channel", "unknown", identifierChannel, facts.className(), sourceMethod)
-                );
-            }
+        String resolvedByStack = resolveAndSimulateCall(valueStack, owner, call.name, call.desc);
+        if (resolvedByStack != null) {
+            pushRecent(recentChannelCandidates, resolvedByStack);
+            addChannelFindingUnique(
+                    facts,
+                    new ChannelFinding("minecraft-plugin-channel", "unknown", resolvedByStack, facts.className(), sourceMethod)
+            );
         }
 
         if (owner.equals("org.bukkit.plugin.messaging.Messenger") || owner.equals("org.bukkit.plugin.messaging.StandardMessenger")) {
@@ -130,10 +161,22 @@ public class BytecodeFactExtractor {
             }
         }
 
+        String callChannel = resolveChannelFromStackForRegistration(valueStack, owner, call.name, call.desc);
+        if (callChannel != null) {
+            channelCandidate = callChannel;
+        }
+
         if (isFabricChannelRegistrationCall(owner, call.name) && channelCandidate != null) {
             addChannelFindingUnique(
                     facts,
                     new ChannelFinding("fabric-networking", inferFabricDirection(owner, call.name), channelCandidate, facts.className(), sourceMethod)
+            );
+        }
+
+        if (isForgeChannelRegistrationCall(owner, call.name) && channelCandidate != null) {
+            addChannelFindingUnique(
+                    facts,
+                    new ChannelFinding("forge-networking", "unknown", channelCandidate, facts.className(), sourceMethod)
             );
         }
 
@@ -154,11 +197,25 @@ public class BytecodeFactExtractor {
                 || methodName.equals("<init>"));
     }
 
+    private static boolean isResourceLocationFactoryCall(String owner, String methodName) {
+        return owner.equals("net.minecraft.resources.ResourceLocation")
+                && (methodName.equals("<init>")
+                || methodName.equals("fromNamespaceAndPath")
+                || methodName.equals("tryParse")
+                || methodName.equals("parse"));
+    }
+
     private static boolean isFabricChannelRegistrationCall(String owner, String methodName) {
         if (!containsAny(owner, "fabricmc.fabric.api.networking", "fabric.api.networking")) {
             return false;
         }
         return containsAny(methodName, "register", "receiver", "handler", "payload", "channel");
+    }
+
+    private static boolean isForgeChannelRegistrationCall(String owner, String methodName) {
+        // Forge/NeoForge commonly uses NetworkRegistry.newSimpleChannel or SimpleChannel registration.
+        return containsAny(owner, "net.minecraftforge.network", "net.neoforged.neoforge.network")
+                && containsAny(methodName, "newSimpleChannel", "registerMessage", "messageBuilder", "addNetworkChannel", "createChannel");
     }
 
     private static String inferFabricDirection(String owner, String methodName) {
@@ -189,6 +246,201 @@ public class BytecodeFactExtractor {
         }
         String last = values.length > 0 ? values[values.length - 1] : null;
         return looksLikeNamespacedChannel(last) ? last : null;
+    }
+
+    private static void handleFieldInsn(
+            Deque<StackValue> valueStack,
+            Map<String, String> staticFieldChannels,
+            ClassBytecodeFacts facts,
+            String sourceMethod,
+            FieldInsnNode fieldInsn
+    ) {
+        String owner = internalToJava(fieldInsn.owner);
+        String fieldKey = owner + "." + fieldInsn.name + ":" + fieldInsn.desc;
+        if (fieldInsn.getOpcode() == Opcodes.GETSTATIC) {
+            String channel = staticFieldChannels.get(fieldKey);
+            if (channel != null) {
+                valueStack.addLast(StackValue.channel(channel));
+            } else {
+                valueStack.addLast(StackValue.unknown());
+            }
+            return;
+        }
+        if (fieldInsn.getOpcode() == Opcodes.PUTSTATIC) {
+            StackValue top = pollLast(valueStack);
+            if (top != null && top.kind == StackKind.CHANNEL) {
+                staticFieldChannels.put(fieldKey, top.value);
+                addChannelFindingUnique(
+                        facts,
+                        new ChannelFinding("minecraft-plugin-channel", "unknown", top.value, facts.className(), sourceMethod)
+                );
+            }
+            return;
+        }
+
+        // Non-static field accesses are ignored for now; push unknown to keep stack roughly aligned.
+        if (fieldInsn.getOpcode() == Opcodes.GETFIELD) {
+            valueStack.addLast(StackValue.unknown());
+        } else if (fieldInsn.getOpcode() == Opcodes.PUTFIELD) {
+            pollLast(valueStack);
+        }
+    }
+
+    private static StackValue pollLast(Deque<StackValue> valueStack) {
+        return valueStack.isEmpty() ? null : valueStack.removeLast();
+    }
+
+    private static String resolveAndSimulateCall(Deque<StackValue> valueStack, String owner, String methodName, String desc) {
+        // Very small stack interpreter: we only care about known Identifier/ResourceLocation constructions/factories.
+        if (isIdentifierFactoryCall(owner, methodName)) {
+            String channel = tryPopIdentifierChannel(valueStack, methodName, desc);
+            if (channel != null) {
+                valueStack.addLast(StackValue.channel(channel));
+                return channel;
+            }
+        }
+        if (isResourceLocationFactoryCall(owner, methodName)) {
+            String channel = tryPopResourceLocationChannel(valueStack, methodName, desc);
+            if (channel != null) {
+                valueStack.addLast(StackValue.channel(channel));
+                return channel;
+            }
+        }
+        // Otherwise, we don't understand the stack behavior; best-effort: clear a bit to avoid runaway.
+        if (!valueStack.isEmpty() && valueStack.size() > 32) {
+            while (valueStack.size() > 16) {
+                valueStack.removeFirst();
+            }
+        }
+        return null;
+    }
+
+    private static String resolveChannelFromStackForRegistration(Deque<StackValue> valueStack, String owner, String methodName, String desc) {
+        // Fabric API: Identifier is commonly the first arg.
+        if (isFabricChannelRegistrationCall(owner, methodName) && desc != null && desc.contains("Lnet/minecraft/util/Identifier;")) {
+            StackValue candidate = findLastChannel(valueStack, 6);
+            return candidate == null ? null : candidate.value;
+        }
+        // Forge API: ResourceLocation is commonly the first arg for newSimpleChannel.
+        if (isForgeChannelRegistrationCall(owner, methodName) && desc != null && desc.contains("Lnet/minecraft/resources/ResourceLocation;")) {
+            StackValue candidate = findLastChannel(valueStack, 6);
+            return candidate == null ? null : candidate.value;
+        }
+        return null;
+    }
+
+    private static StackValue findLastChannel(Deque<StackValue> valueStack, int lookback) {
+        if (valueStack.isEmpty()) {
+            return null;
+        }
+        StackValue[] values = valueStack.toArray(new StackValue[0]);
+        for (int i = values.length - 1; i >= 0 && lookback-- > 0; i--) {
+            if (values[i].kind == StackKind.CHANNEL) {
+                return values[i];
+            }
+        }
+        return null;
+    }
+
+    private static String tryPopIdentifierChannel(Deque<StackValue> valueStack, String methodName, String desc) {
+        // INVOKESTATIC Identifier.of(String,String) -> Identifier
+        if (methodName.equals("of") && "(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraft/util/Identifier;".equals(desc)) {
+            StackValue path = pollLast(valueStack);
+            StackValue namespace = pollLast(valueStack);
+            if (namespace != null && path != null && namespace.kind == StackKind.STRING && path.kind == StackKind.STRING) {
+                String ns = namespace.value;
+                String p = path.value;
+                if (looksLikeIdentifierParts(ns, p)) {
+                    return ns + ":" + p;
+                }
+            }
+            return null;
+        }
+        // new Identifier(String, String)
+        if (methodName.equals("<init>") && "(Ljava/lang/String;Ljava/lang/String;)V".equals(desc)) {
+            StackValue path = pollLast(valueStack);
+            StackValue namespace = pollLast(valueStack);
+            pollLast(valueStack); // consumes the invoked instance
+            if (namespace != null && path != null && namespace.kind == StackKind.STRING && path.kind == StackKind.STRING) {
+                String ns = namespace.value;
+                String p = path.value;
+                if (looksLikeIdentifierParts(ns, p)) {
+                    // The other DUP'ed object ref would still be on stack; we don't model DUP, but we still emit channel.
+                    return ns + ":" + p;
+                }
+            }
+            return null;
+        }
+        // new Identifier(String) with namespaced form.
+        if (methodName.equals("<init>") && "(Ljava/lang/String;)V".equals(desc)) {
+            StackValue single = pollLast(valueStack);
+            pollLast(valueStack); // instance
+            if (single != null && single.kind == StackKind.STRING && looksLikeNamespacedChannel(single.value)) {
+                return single.value;
+            }
+        }
+        if ((methodName.equals("tryParse") || methodName.equals("of")) && desc != null && desc.equals("(Ljava/lang/String;)Lnet/minecraft/util/Identifier;")) {
+            StackValue single = pollLast(valueStack);
+            if (single != null && single.kind == StackKind.STRING && looksLikeNamespacedChannel(single.value)) {
+                return single.value;
+            }
+        }
+        return null;
+    }
+
+    private static String tryPopResourceLocationChannel(Deque<StackValue> valueStack, String methodName, String desc) {
+        if (methodName.equals("<init>") && "(Ljava/lang/String;Ljava/lang/String;)V".equals(desc)) {
+            StackValue path = pollLast(valueStack);
+            StackValue namespace = pollLast(valueStack);
+            pollLast(valueStack); // instance
+            if (namespace != null && path != null && namespace.kind == StackKind.STRING && path.kind == StackKind.STRING) {
+                String ns = namespace.value;
+                String p = path.value;
+                if (looksLikeIdentifierParts(ns, p)) {
+                    return ns + ":" + p;
+                }
+            }
+        }
+        if ((methodName.equals("tryParse") || methodName.equals("parse")) && desc != null && desc.equals("(Ljava/lang/String;)Lnet/minecraft/resources/ResourceLocation;")) {
+            StackValue single = pollLast(valueStack);
+            if (single != null && single.kind == StackKind.STRING && looksLikeNamespacedChannel(single.value)) {
+                return single.value;
+            }
+        }
+        return null;
+    }
+
+    private enum StackKind {
+        STRING,
+        CHANNEL,
+        OBJECT,
+        UNKNOWN
+    }
+
+    private static final class StackValue {
+        private final StackKind kind;
+        private final String value;
+
+        private StackValue(StackKind kind, String value) {
+            this.kind = kind;
+            this.value = value;
+        }
+
+        static StackValue string(String value) {
+            return new StackValue(StackKind.STRING, value);
+        }
+
+        static StackValue channel(String value) {
+            return new StackValue(StackKind.CHANNEL, value);
+        }
+
+        static StackValue object(String type) {
+            return new StackValue(StackKind.OBJECT, type);
+        }
+
+        static StackValue unknown() {
+            return new StackValue(StackKind.UNKNOWN, "");
+        }
     }
 
     private static boolean looksLikeIdentifierParts(String namespace, String path) {
