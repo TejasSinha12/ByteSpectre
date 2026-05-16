@@ -21,6 +21,7 @@ The first implementation delivers a runnable foundation:
 - Produce risk scoring, suspicious indicators, behavior categories, and explanation text.
 - Extract plugin/mod descriptors (Fabric/Quilt/Forge/NeoForge, Bukkit/Paper, Velocity/Bungee) and surface key fields.
 - Extract plugin/mod channels when detectable from bytecode callsites (Bukkit/Fabric/Forge-style patterns), including common `Identifier` / `ResourceLocation` construction and static-field harvesting, plus fallback raw scans for channel-like identifiers in packed/unreadable artifacts.
+- Extract generic JVM threat surface signals: hardcoded endpoints (URLs/IPs/webhooks), embedded dependency fingerprints, and high-risk bytecode APIs (process execution, native loading, instrumentation, crypto, dynamic classloading).
 - Decompile JARs to a downloadable source ZIP (CFR) with an optional deobfuscation mode that enables CFR anti-obfuscation and rename/recovery options for better readability.
 - Render an enterprise-style analysis dashboard with live event feed, risk breakdown, asset intelligence, and graph-oriented data panels.
 

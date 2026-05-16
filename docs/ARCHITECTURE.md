@@ -104,3 +104,12 @@ Important limitations:
 
 - Static extraction can still miss runtime-built/encrypted channel identifiers.
 - Raw-byte fallback findings are lower-confidence and can include non-protocol strings that happen to match `namespace:path` patterns.
+
+## Generic JVM Threat Surface
+
+ByteSpectre also reports non-domain-specific (non-Minecraft) signals intended for general Java reverse engineering and malware triage:
+
+- Hardcoded endpoints extracted from string constants (URLs, IPv4s, Discord webhooks, large base64-like blobs).
+- Embedded dependency fingerprints extracted from `BOOT-INF/lib` / `WEB-INF/lib` entries and `META-INF/maven/**/pom.properties`.
+
+These findings are surfaced as both UI panels (Threat tab) and, where applicable, severity-weighted indicators (Networking / Bytecode categories).
