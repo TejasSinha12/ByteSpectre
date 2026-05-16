@@ -1,10 +1,11 @@
-import { Boxes, Braces, GitBranch, History, Radar, Radio, ShieldAlert } from 'lucide-react';
+import { Boxes, Braces, GitBranch, History, Radar, Radio, ShieldAlert, Siren } from 'lucide-react';
 
 const sections = [
   { href: '#classification', label: 'Classify', icon: Boxes },
   { href: '#history', label: 'History', icon: History },
   { href: '#capabilities', label: 'Engine', icon: Radar },
   { href: '#indicators', label: 'Indicators', icon: ShieldAlert },
+  { href: '#threat', label: 'Threat', icon: Siren },
   { href: '#relationships', label: 'Graph', icon: GitBranch },
   { href: '#descriptors', label: 'Metadata', icon: Braces },
   { href: '#channels', label: 'Channels', icon: Radio }

@@ -5,6 +5,7 @@ import { CapabilitiesPanel } from './components/CapabilitiesPanel';
 import { CategoryChips } from './components/CategoryChips';
 import { ClassificationPanel } from './components/ClassificationPanel';
 import { ChannelsPanel } from './components/ChannelsPanel';
+import { ThreatPanel } from './components/ThreatPanel';
 import { DescriptorPanel } from './components/DescriptorPanel';
 import { DocsPage } from './components/DocsPage';
 import { EmptyWorkbench } from './components/EmptyWorkbench';
@@ -175,6 +176,7 @@ export function App() {
             </div>
             <div id="capabilities"><CapabilitiesPanel capabilities={capabilities} /></div>
             <div id="indicators" className="wide-panel"><IndicatorTable indicators={report.indicators} /></div>
+            <div id="threat" className="wide-panel"><ThreatPanel report={report} /></div>
             <div id="relationships" className="wide-panel"><RelationshipGraph relationships={report.relationships} methodCallEdges={report.methodCallEdges} /></div>
             <div id="descriptors"><DescriptorPanel descriptors={report.descriptorMetadata} /></div>
             <div id="channels"><ChannelsPanel report={report} /></div>
